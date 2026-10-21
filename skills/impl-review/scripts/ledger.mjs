@@ -47,6 +47,6 @@ if (cmd === "sync") {
   const id = args._[2];
   if (!id) fail("缺少 L-id 或 fingerprint");
   if (!args.status) fail("缺少 --status");
-  const e = closeEntry(root, id, args.status, args.reason || "");
+  const e = closeEntry(root, id, args.status, args.reason || "", { by: args.by || "", compensation: args.compensation || "" });
   console.log(JSON.stringify({ ok: true, id: e.id, status: e.status }, null, 2));
 } else fail(`未知子命令：${cmd}`);

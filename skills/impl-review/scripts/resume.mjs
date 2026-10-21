@@ -15,9 +15,10 @@
  */
 
 import { existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { discoverReviews, isValidId } from "./lib/layout.mjs";
-import { loadState, reconcile, sha256File, loadPlan } from "./lib/review-state.mjs";
+import { loadState, reconcile, sha256File, loadPlan, saveState, appendProgress } from "./lib/review-state.mjs";
 
 const argv = process.argv.slice(2);
 const args = { _: [] };
@@ -92,8 +93,24 @@ if (stateSha && actual !== stateSha && !args.force) {
   process.exit(4);
 }
 
+// HEAD 与基线一致性（方案 §7.5）
+const baselineCommit = target.state.baseline?.commit || "";
+if (baselineCommit && !args.force) {
+  let head = "";
+  try {
+    head = execFileSync("git", ["-C", target.state.root || root, "rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim();
+  } catch { /* 非 git 仓库则跳过 */ }
+  const same = head && (baselineCommit.startsWith(head) || head.startsWith(baselineCommit));
+  if (head && !same) {
+    console.error(`resume: 基线提交 ${baselineCommit} 与当前 HEAD ${head} 不一致。确认无碍后加 --force。`);
+    process.exit(5);
+  }
+}
+
 const plan = loadPlan(target.dir);
 const result = reconcile(target.dir);
+saveState(target.dir, result.state);
+appendProgress(target.dir, { batch: "-", status: "recovery", ts: new Date().toISOString(), done: result.done.length, pending: result.pending.length, discarded: result.discarded.length });
 const st = loadState(target.dir);
 const pendingSteps = Object.entries(st.steps || {})
   .filter(([, v]) => v.status !== "done" && v.status !== "skipped")
@@ -123,6 +140,8 @@ else {
   if (payload.partial_batches.length) {
     for (const p of payload.partial_batches) console.log(`未完成批：${p.batch} 已填 ${p.filled} 格，从 ${p.next_cell} 继续`);
   }
+  if (st.stalled?.length) console.log(`心跳/批次超时：${st.stalled.join(", ")}`);
+  if (st.tampered?.length) console.log(`产物被改动：${st.tampered.join(", ")}`);
   if (payload.interruptions.length) console.log(`历史中断：${payload.interruptions.length} 次`);
   console.log("\n从 next_batches 继续；每批完成后用 state.mjs batch 落盘。");
 }

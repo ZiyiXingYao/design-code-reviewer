@@ -1,13 +1,14 @@
 {
   "name": "design-code-reviewer",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "type": "module",
   "description": "CodeBuddy skills: design review for brainstorming-archify docs, and implementation review against those designs",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
     "install": "node install.mjs",
-    "example": "node examples/run-mini.mjs"
+    "example": "node examples/run-mini.mjs",
+    "dry-run": "node scripts/dry-run.mjs"
   },
   "engines": {
     "node": ">=20"

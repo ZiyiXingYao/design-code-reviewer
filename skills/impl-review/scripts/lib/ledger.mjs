@@ -30,9 +30,9 @@ export function fingerprint(type, title, location) {
 
 export function loadLedger(root) {
   const p = ledgerPath(root);
-  if (!existsSync(p)) return { schema_version: 1, updated_at: "", entries: [] };
+  if (!existsSync(p)) return { schema_version: 1, updated_at: "", entries: [], reviews: [] };
   const j = parseYaml(readFileSync(p, "utf8"));
-  return { schema_version: j.schema_version || 1, updated_at: j.updated_at || "", entries: j.entries || [] };
+  return { schema_version: j.schema_version || 1, updated_at: j.updated_at || "", entries: j.entries || [], reviews: j.reviews || [] };
 }
 
 function atomicWrite(file, text) {
@@ -91,16 +91,38 @@ export function syncLedger(root, reviewDir) {
     byFp.set(fp, entry);
     created++;
   }
+  const verdict = readJson("08-verdict.json");
+  const vv = verdict.verdicts || [];
+  const conclusion = argsConclusion(dir, vv);
+  ledger.reviews = [...(ledger.reviews || []), {
+    review_id: reviewId,
+    review_type: st.review_type || plan.review_type,
+    at,
+    conclusion,
+    p0: vv.filter((v) => v.decision === "upheld" && v.level === "P0").length,
+    p1: vv.filter((v) => v.decision === "upheld" && v.level === "P1").length,
+    unresolved: vv.filter((v) => v.decision === "unresolved").length,
+    report_dir: st.report?.dir || ""
+  }];
   saveLedger(root, ledger);
-  return { ok: true, path: ledgerPath(root), total: ledger.entries.length, created, updated, review_id: reviewId };
+  return { ok: true, path: ledgerPath(root), total: ledger.entries.length, created, updated, review_id: reviewId, reviews: ledger.reviews.length };
 }
 
-export function closeEntry(root, idOrFp, status, reason) {
+function argsConclusion(dir, verdicts) {
+  const p0 = verdicts.filter((v) => v.decision === "upheld" && v.level === "P0").length;
+  const p1 = verdicts.filter((v) => v.decision === "upheld" && v.level === "P1").length;
+  return p0 > 0 ? "不通过" : p1 > 0 ? "有条件通过" : "通过";
+}
+
+export function closeEntry(root, idOrFp, status, reason, opts = {}) {
   if (!STATUS.includes(status)) throw new Error(`非法状态：${status}（允许 ${STATUS.join("/")}）`);
   const ledger = loadLedger(root);
   const e = ledger.entries.find((x) => x.id === idOrFp || x.fingerprint === idOrFp);
   if (!e) throw new Error(`账本条目不存在：${idOrFp}`);
   e.status = status;
+  if (status === "accepted") {
+    e.acceptance = { by: opts.by || "", reason: reason || "", compensation: opts.compensation || "" };
+  }
   e.history = [...(e.history || []), { at: new Date().toISOString(), action: status, reason: reason || "" }];
   saveLedger(root, ledger);
   return e;

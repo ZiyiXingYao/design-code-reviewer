@@ -8,14 +8,18 @@
  *   state.mjs heartbeat <dir> --id b01 --beat 3
  *   state.mjs step <dir> --id A2 --status running|done|failed|skipped [--reason ...] [--done 7] [--total 15] [--output file]
  *   state.mjs agent <dir> --role scout-s1 --agent-id sub-a01 [--findings 4] [--retries 0] [--coverage-note "..."]
- *   state.mjs stats <dir> --accusations 27 --upheld 12 --dismissed 9 --unresolved 6 --valid-defense 8 [--escalated 0]
+ *   state.mjs stats <dir> --accusations 27 --upheld 12 --dismissed 9 --unresolved 6 --valid-defense 8 --defended 18 [--escalated 0] [--first-round 27]
  *   state.mjs transition <dir> <scoped|scanning|verifying|reported|closed> --reason "..."
  *   state.mjs interruption <dir> --batch b12 --reason "..." --action "..."
  *   state.mjs show <dir>
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
+import { auditDir, makeReviewId, rel, workDir } from "./lib/layout.mjs";
+import { atomicWrite } from "./lib/review-state.mjs";
+import { generateTaskMd } from "./lib/task-plan.mjs";
+import { syncForReview } from "./lib/ledger.mjs";
 import {
   addLog, commitBatch, initReview, loadState, reconcile, saveState, updateState,
   appendProgress, computeCoverage, loadPlan, loadBatches
@@ -46,27 +50,34 @@ if (cmd !== "init" && !dir) fail("缺少评审目录");
 
 switch (cmd) {
   case "init": {
-    if (!dir) fail("缺少评审目录");
     if (!args.type) fail("缺少 --type");
     if (!args.plan) fail("缺少 --plan（批次计划 JSON）");
+    const root = resolve(args._[0] || ".");
+    const id = args.id || makeReviewId(root, args.type);
+    const reviewDir = workDir(root, id);
     const spec = JSON.parse(readFileSync(resolve(args.plan), "utf8"));
-    const state = initReview(dir, {
+    const state = initReview(reviewDir, {
       type: args.type,
+      reviewId: id,
+      root,
       tier: args.tier || "standard",
       maxConcurrency: args["max-concurrency"] ? Number(args["max-concurrency"]) : 4,
       expected: spec.expected || {},
       steps: spec.steps || [],
       batches: spec.batches || [],
+      planExtra: spec.coverage_floor_exempt ? { coverage_floor_exempt: true } : {},
       commit: args.commit || "",
       designState: args["design-state"] || "",
       reopen: args.reopen ? Number(args.reopen) : 0,
       bench: args.bench || ""
     });
-    console.log(JSON.stringify({ ok: true, dir, batches: state.plan.total_batches }, null, 2));
+    console.log(JSON.stringify({ ok: true, review_id: id, dir: reviewDir, audit: auditDir(root, id), batches: state.plan.total_batches }, null, 2));
     break;
   }
   case "recover": {
     const s = reconcile(dir);
+    saveState(dir, s.state);
+    appendProgress(dir, { batch: "-", status: "recovery", ts: new Date().toISOString(), done: s.done.length, pending: s.pending.length, discarded: s.discarded.length });
     console.log(args.json ? JSON.stringify(s, null, 2)
       : `恢复：完成 ${s.done.length} / 待跑 ${s.pending.length} / 丢弃 ${s.discarded.length} / 跳过 ${s.skipped.length}`);
     break;
@@ -78,6 +89,22 @@ switch (cmd) {
     console.log(`已落盘 ${payload.batch}；完成 ${s.done.length}/${s.done.length + s.pending.length}`);
     break;
   }
+  case "partial": {
+    if (!args.batch || !args.payload) fail("缺少 --batch / --payload");
+    if (loadState(dir).state === "closed") fail("评审已 closed，拒绝写入");
+    const payload = JSON.parse(readFileSync(resolve(args.payload), "utf8"));
+    const filled = payload.filled_cells || [];
+    const out = {
+      batch: args.batch, group: payload.group || "", unit: payload.unit || "",
+      filled_cells: filled, cells: payload.cells || [],
+      partial_findings: payload.partial_findings || payload.findings || [],
+      updated_at: new Date().toISOString()
+    };
+    atomicWrite(join(dir, "batches", `${args.batch}.partial.json`), JSON.stringify(out, null, 2) + "\n");
+    console.log(`已记录 partial ${args.batch}：${filled.length} 格（下一格 #${filled.length + 1}）`);
+    break;
+  }
+
   case "heartbeat": {
     if (!args.id) fail("缺少 --id");
     appendProgress(dir, { batch: args.id, status: "running", beat: Number(args.beat || 1), ts: new Date().toISOString() });
@@ -86,6 +113,7 @@ switch (cmd) {
   }
   case "step": {
     if (!args.id || !args.status) fail("缺少 --id / --status");
+    if (loadState(dir).state === "closed") fail("评审已 closed，拒绝写入");
     const s = updateState(dir, (st) => {
       const cur = st.steps[args.id] || {};
       const next = { ...cur, status: args.status, at: new Date().toISOString() };
@@ -110,6 +138,9 @@ switch (cmd) {
         agent_id: args["agent-id"] || "",
         findings: args.findings ? Number(args.findings) : undefined,
         retries: args.retries ? Number(args.retries) : 0,
+        started: args.started || undefined,
+        ended: args.ended || undefined,
+        tokens: args.tokens ? Number(args.tokens) : undefined,
         coverage_note: args["coverage-note"] || undefined,
         failed: args.failed === true || args.failed === "true" ? true : undefined,
         at: new Date().toISOString()
@@ -125,15 +156,20 @@ switch (cmd) {
     const s = updateState(dir, (st) => {
       st.adversarial = st.adversarial || { rounds: 0, agents: [] };
       const n = (k) => (args[k] === undefined ? 0 : Number(args[k]));
+      const accusations = n("accusations");
+      const defended = args.defended === undefined ? accusations : n("defended");
+      const firstRound = args["first-round"] === undefined ? accusations : n("first-round");
       st.adversarial.stats = {
-        accusations: n("accusations"), upheld: n("upheld"), dismissed: n("dismissed"),
-        unresolved: n("unresolved"), valid_defense: n("valid-defense"), escalated: n("escalated")
+        accusations, upheld: n("upheld"), dismissed: n("dismissed"),
+        unresolved: n("unresolved"), valid_defense: n("valid-defense"),
+        defended, escalated: n("escalated"), first_round: firstRound
       };
-      const t = st.adversarial.stats.accusations || 1;
+      const t = accusations || 1;
       st.adversarial.rates = {
         uphold_rate: Number((st.adversarial.stats.upheld / t).toFixed(3)),
         unresolved_rate: Number((st.adversarial.stats.unresolved / t).toFixed(3)),
-        escalation_rate: Number((st.adversarial.stats.escalated / t).toFixed(3))
+        escalation_rate: Number((st.adversarial.stats.escalated / (firstRound || 1)).toFixed(3)),
+        valid_defense_rate: Number((st.adversarial.stats.valid_defense / (defended || 1)).toFixed(3))
       };
     });
     console.log(JSON.stringify(s.adversarial.stats));
@@ -162,6 +198,78 @@ switch (cmd) {
     console.log(`已记录中断 ${args.batch}（共 ${s.interruptions.length}）`);
     break;
   }
+  case "promote": {
+    fail("promote 已由 approve 取代：node state.mjs approve <reviewDir> --reviewer \"<name>\"");
+    break;
+  }
+
+  case "approve": {
+    if (typeof args.reviewer !== "string" || !args.reviewer.trim()) fail("缺少 --reviewer（人工批准人）");
+    const st = loadState(dir);
+    if (st.state === "closed") fail("评审已 closed，无需重复 approve");
+    if (st.state !== "reported") fail(`当前状态 ${st.state}，需先完成报告并进入 reported`);
+
+    const gateFile = join(dir, "gate-result.md");
+    if (!existsSync(gateFile)) fail("缺 gate-result.md，请先运行 gate.mjs");
+    if (!/结论：通过/.test(readFileSync(gateFile, "utf8"))) fail("gate 未通过，拒绝批准");
+
+    for (const f of ["REPORT.md", "SUMMARY.md"]) {
+      const fp = join(dir, f);
+      if (!existsSync(fp) || statSync(fp).size === 0) fail(`缺少或为空：${f}`);
+    }
+
+    const readJson = (name) => {
+      const fp = join(dir, name);
+      if (!existsSync(fp)) fail(`缺少 ${name}`);
+      return JSON.parse(readFileSync(fp, "utf8"));
+    };
+    const findings = readJson("05-findings.json").findings || [];
+    const verdict = readJson("08-verdict.json");
+    const accusations = readJson("06-accusations.json").accusations || [];
+    const taskPath = join(dir, "task.md");
+    const existing = existsSync(taskPath) ? readFileSync(taskPath, "utf8") : "";
+
+    const p0 = verdict.verdicts.filter((v) => v.decision === "upheld" && v.level === "P0").length;
+    const p1 = verdict.verdicts.filter((v) => v.decision === "upheld" && v.level === "P1").length;
+    const conclusion = args.conclusion || (p0 > 0 ? "不通过" : p1 > 0 ? "有条件通过" : "通过");
+
+    const gen = generateTaskMd({
+      reviewId: st.review_id || basename(dir),
+      reviewType: st.review_type,
+      reviewer: args.reviewer,
+      at: new Date().toISOString(),
+      conclusion,
+      findings,
+      verdicts: verdict.verdicts || [],
+      accusations,
+      includeP2: args["include-p2"] === true,
+      existing
+    });
+    if (!gen.ok) fail(`任务生成失败：${gen.errors.join("；")}`);
+    atomicWrite(taskPath, gen.markdown);
+
+    const root = st.root ? resolve(st.root) : resolve(".");
+    const ledgerRes = syncForReview(root, dir);
+    const out = args.out ? resolve(args.out) : auditDir(root, st.review_id || basename(dir));
+    mkdirSync(out, { recursive: true });
+    const files = ["REPORT.md", "SUMMARY.md", "task.md"];
+    for (const f of files) copyFileSync(join(dir, f), join(out, f));
+
+    // 可读裁断表（工作产物，不进入交付三件套）
+    const verdictJson = readJson("08-verdict.json");
+    const lines = ["# 裁断表", "", "| 指控 | 裁定 | 最终级别 | 理由 |", "|---|---|---|---|"];
+    for (const v of verdictJson.verdicts || []) lines.push(`| ${v.accusation_id} | ${v.decision} | ${v.level} | ${String(v.reason || "").replace(/\|/g, "/")} |`);
+    atomicWrite(join(dir, "08-verdict.md"), lines.join("\n") + "\n");
+
+    updateState(dir, (s) => {
+      s.report = { dir: rel(root, out), files };
+      s.approval = { reviewer: args.reviewer, at: new Date().toISOString(), note: args.note || "" };
+      addLog(s, "closed", `人工批准（${args.reviewer}），生成 task.md 并交付`);
+    });
+    console.log(JSON.stringify({ ok: true, audit: out, files, tasks: gen.tasks.length, ledger: { created: ledgerRes.created, updated: ledgerRes.updated, total: ledgerRes.total }, task_md: join(out, "task.md") }, null, 2));
+    break;
+  }
+
   case "show": {
     const st = loadState(dir);
     const plan = loadPlan(dir);

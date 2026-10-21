@@ -8,7 +8,7 @@
  *   state.mjs heartbeat <dir> --id b01 --beat 3
  *   state.mjs step <dir> --id A2 --status running|done|failed|skipped [--reason ...] [--done 7] [--total 15] [--output file]
  *   state.mjs agent <dir> --role scout-s1 --agent-id sub-a01 [--findings 4] [--retries 0] [--coverage-note "..."]
- *   state.mjs stats <dir> --accusations 27 --upheld 12 --dismissed 9 --unresolved 6 --valid-defense 8 [--escalated 0]
+ *   state.mjs stats <dir> --accusations 27 --upheld 12 --dismissed 9 --unresolved 6 --valid-defense 8 --defended 18 [--escalated 0] [--first-round 27]
  *   state.mjs transition <dir> <scoped|scanning|verifying|reported|closed> --reason "..."
  *   state.mjs interruption <dir> --batch b12 --reason "..." --action "..."
  *   state.mjs show <dir>
@@ -76,6 +76,8 @@ switch (cmd) {
   }
   case "recover": {
     const s = reconcile(dir);
+    saveState(dir, s.state);
+    appendProgress(dir, { batch: "-", status: "recovery", ts: new Date().toISOString(), done: s.done.length, pending: s.pending.length, discarded: s.discarded.length });
     console.log(args.json ? JSON.stringify(s, null, 2)
       : `恢复：完成 ${s.done.length} / 待跑 ${s.pending.length} / 丢弃 ${s.discarded.length} / 跳过 ${s.skipped.length}`);
     break;
@@ -92,7 +94,12 @@ switch (cmd) {
     if (loadState(dir).state === "closed") fail("评审已 closed，拒绝写入");
     const payload = JSON.parse(readFileSync(resolve(args.payload), "utf8"));
     const filled = payload.filled_cells || [];
-    const out = { batch: args.batch, group: payload.group || "", unit: payload.unit || "", filled_cells: filled, cells: payload.cells || [], updated_at: new Date().toISOString() };
+    const out = {
+      batch: args.batch, group: payload.group || "", unit: payload.unit || "",
+      filled_cells: filled, cells: payload.cells || [],
+      partial_findings: payload.partial_findings || payload.findings || [],
+      updated_at: new Date().toISOString()
+    };
     atomicWrite(join(dir, "batches", `${args.batch}.partial.json`), JSON.stringify(out, null, 2) + "\n");
     console.log(`已记录 partial ${args.batch}：${filled.length} 格（下一格 #${filled.length + 1}）`);
     break;
@@ -131,6 +138,9 @@ switch (cmd) {
         agent_id: args["agent-id"] || "",
         findings: args.findings ? Number(args.findings) : undefined,
         retries: args.retries ? Number(args.retries) : 0,
+        started: args.started || undefined,
+        ended: args.ended || undefined,
+        tokens: args.tokens ? Number(args.tokens) : undefined,
         coverage_note: args["coverage-note"] || undefined,
         failed: args.failed === true || args.failed === "true" ? true : undefined,
         at: new Date().toISOString()
@@ -146,15 +156,20 @@ switch (cmd) {
     const s = updateState(dir, (st) => {
       st.adversarial = st.adversarial || { rounds: 0, agents: [] };
       const n = (k) => (args[k] === undefined ? 0 : Number(args[k]));
+      const accusations = n("accusations");
+      const defended = args.defended === undefined ? accusations : n("defended");
+      const firstRound = args["first-round"] === undefined ? accusations : n("first-round");
       st.adversarial.stats = {
-        accusations: n("accusations"), upheld: n("upheld"), dismissed: n("dismissed"),
-        unresolved: n("unresolved"), valid_defense: n("valid-defense"), escalated: n("escalated")
+        accusations, upheld: n("upheld"), dismissed: n("dismissed"),
+        unresolved: n("unresolved"), valid_defense: n("valid-defense"),
+        defended, escalated: n("escalated"), first_round: firstRound
       };
-      const t = st.adversarial.stats.accusations || 1;
+      const t = accusations || 1;
       st.adversarial.rates = {
         uphold_rate: Number((st.adversarial.stats.upheld / t).toFixed(3)),
         unresolved_rate: Number((st.adversarial.stats.unresolved / t).toFixed(3)),
-        escalation_rate: Number((st.adversarial.stats.escalated / t).toFixed(3))
+        escalation_rate: Number((st.adversarial.stats.escalated / (firstRound || 1)).toFixed(3)),
+        valid_defense_rate: Number((st.adversarial.stats.valid_defense / (defended || 1)).toFixed(3))
       };
     });
     console.log(JSON.stringify(s.adversarial.stats));
@@ -239,6 +254,12 @@ switch (cmd) {
     mkdirSync(out, { recursive: true });
     const files = ["REPORT.md", "SUMMARY.md", "task.md"];
     for (const f of files) copyFileSync(join(dir, f), join(out, f));
+
+    // 可读裁断表（工作产物，不进入交付三件套）
+    const verdictJson = readJson("08-verdict.json");
+    const lines = ["# 裁断表", "", "| 指控 | 裁定 | 最终级别 | 理由 |", "|---|---|---|---|"];
+    for (const v of verdictJson.verdicts || []) lines.push(`| ${v.accusation_id} | ${v.decision} | ${v.level} | ${String(v.reason || "").replace(/\|/g, "/")} |`);
+    atomicWrite(join(dir, "08-verdict.md"), lines.join("\n") + "\n");
 
     updateState(dir, (s) => {
       s.report = { dir: rel(root, out), files };

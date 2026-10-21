@@ -36,6 +36,7 @@
   "accusations": [{
     "id": "A-003",
     "source_findings": ["F-004"],
+    "source_batches": ["b05", "b09"],
     "dimension_or_lens": "2",
     "location": "src/runtime/state.cpp:88",
     "mechanism": "两个线程直写同一 map，无锁且无 owner 线程",

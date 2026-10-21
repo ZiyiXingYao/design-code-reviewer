@@ -32,7 +32,7 @@ export function scaffold(dir, {
     if (tier !== "quick") {
       st.adversarial.agents = [
         ...["s1", "s2", "s3", "s4", "s5", "s6", "s7"].map((g) => ({
-          role: `scout-${g}`, agent_id: `sub-${g}`, findings: 1, coverage_note: "本组检查完毕"
+          role: `scout-${g}`, agent_id: `sub-${g}`, findings: 1, coverage_note: "本组检查完毕", cross_hints: []
         })),
         { role: "red", agent_id: "sub-red", coverage_note: "17 卡全跑", retries: 0 },
         { role: "blue", agent_id: "sub-blue", retries: 0 },

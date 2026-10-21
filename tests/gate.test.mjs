@@ -32,7 +32,7 @@ function build(dir, opts = {}) {
     accusations: [{ id: "A-001", source_findings: ["F-001"], location: "x", mechanism: "m", consequence: "c" }],
     defenses: [{ accusation_id: "A-001", claim: "invalid", location: "-", mechanism: "-" }],
     verdicts: [{ accusation_id: "A-001", decision: opts.decision ?? "upheld", level: opts.level ?? "P0", reason: opts.reason ?? "机制成立" }],
-    stats: { accusations: 1, upheld: 1, dismissed: 0, unresolved: 0, valid_defense: 0 }
+    stats: { accusations: 1, upheld: 1, dismissed: 0, unresolved: 0, valid_defense: 0, defended: 1 }
   });
   writeReports(dir, { bench: opts.bench ?? "L2", extra: opts.extra ?? "" });
   return dir;

@@ -11,10 +11,12 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadPlan, loadState, listBatchFiles, loadBatches, computeCoverage } from "./lib/review-state.mjs";
+import { checkFloor } from "./lib/plan-floor.mjs";
 
 const dir = process.argv[2];
 if (!dir) { console.error("用法: node gate.mjs <reviewDir> [--json]"); process.exit(2); }
 const asJson = process.argv.includes("--json");
+const allowPartialCoverage = process.argv.includes("--allow-partial-coverage");
 
 const results = [];
 function check(id, ok, detail, blocking = true) {
@@ -61,7 +63,7 @@ try {
   }).map((b) => `${b.id}:${byId.get(b.id).status}`);
   const extra = batches.filter((b) => !(plan.batches || []).some((x) => x.id === b.batch)).map((b) => b.batch);
   const skippedNoReason = batches.filter((b) => b.status === "skipped" && !b.reason).map((b) => b.batch);
-  check("G2 批产物完整", !missing.length && !unfinished.length && !extra.length && !skippedNoReason.length && !tmps.length,
+  check("G2 批产物完整", !missing.length && !unfinished.length && !extra.length && !skippedNoReason.length && !tmps.length && !partials.length,
     `缺 ${missing.join(",") || "-"}；未终态 ${unfinished.join(",") || "-"}；计划外 ${extra.join(",") || "-"}；tmp ${tmps.length}；partial ${partials.length}`);
 }
 
@@ -159,6 +161,36 @@ const verdict = readJson(join(dir, "08-verdict.json"));
   check("G8 报告可追溯", problems.length === 0, problems.join("；") || "报告中发现编号均可回溯到批产物");
 }
 
+// G16 覆盖下限
+{
+  const floor = checkFloor(plan);
+  const exempt = allowPartialCoverage || plan.coverage_floor_exempt === true;
+  check("G16 覆盖下限", floor.ok || exempt,
+    (floor.problems.join("；") || "满足下限") + (exempt && !floor.ok ? "（已显式豁免）" : ""),
+    !exempt);
+}
+
+// G17 批量/子代理上限
+{
+  const problems = [];
+  for (const b of batches) {
+    if ((b.findings || []).length > 15) problems.push(`${b.batch} findings ${b.findings.length} > 15`);
+    if ((b.cells || []).length > 25) problems.push(`${b.batch} cells ${b.cells.length} > 25`);
+  }
+  const agents = state.adversarial?.agents || [];
+  if (agents.length > 14) problems.push(`子代理 ${agents.length} > 14`);
+  check("G17 批量上限", problems.length === 0, problems.join("；") || "未超限");
+}
+
+// G15 账本（closed 时）
+{
+  if (state.state !== "closed") check("G15 账本", true, "未 closed，跳过", false);
+  else {
+    const ok = state.ledger?.synced === true;
+    check("G15 账本", ok, ok ? `已同步（新增 ${state.ledger.new} / 仍存在 ${state.ledger.still}）` : "closed 但未同步账本");
+  }
+}
+
 // G13 顺序：去重必须先于对抗
 {
   const pairs = plan.review_type === "design" ? [["A4.5", "A5a"]] : [["B6.5", "B7a"]];
@@ -182,7 +214,19 @@ const verdict = readJson(join(dir, "08-verdict.json"));
   const problems = [];
   if (missing.length) problems.push(`SUMMARY 缺节：${missing.join(",")}`);
   if (plan.review_type === "design" && report && !/##\s*交接块/.test(report)) problems.push("设计报告缺交接块");
-  check("G9 收口完整", problems.length === 0, problems.join("；") || "SUMMARY 六节齐全，交接块存在");
+
+  // 重复发现（同标题 + 同位置）
+  const seen = new Map();
+  for (const f of findings) {
+    const key = `${String(f.title).replace(/\s+/g, "")}|${String(f.location).replace(/:\d+(?:-\d+)?/g, "")}`;
+    if (seen.has(key)) problems.push(`重复发现：${seen.get(key)} 与 ${f.id}`);
+    else seen.set(key, f.id);
+  }
+  check("G9 收口完整", problems.length === 0, problems.join("；") || "SUMMARY 六节齐全，交接块存在，无重复发现");
+
+  // P0/P1 的 depends_on：只在缺失时提示，不阻断
+  const noDep = findings.filter((f) => ["P0", "P1"].includes(f.level) && !Array.isArray(f.depends_on)).map((f) => f.id);
+  check("G9b depends_on", noDep.length === 0, noDep.length ? `缺少 depends_on：${noDep.slice(0, 8).join(",")}` : "P0/P1 均声明依赖", false);
 }
 
 // G10 扫描组完整
@@ -196,8 +240,8 @@ const verdict = readJson(join(dir, "08-verdict.json"));
     if (!a) { problems.push(`缺 scout-${g}`); continue; }
     const batch = batches.find((b) => b.group === g);
     const note = a.coverage_note || batch?.coverage_note;
-    const hints = (a.cross_hints || batch?.cross_hints || []).length;
-    if (!note && !hints) problems.push(`scout-${g} 缺 coverage_note/cross_hints`);
+    const hintsDeclared = Array.isArray(a.cross_hints) || Array.isArray(batch?.cross_hints);
+    if (!note || !hintsDeclared) problems.push(`scout-${g} 缺 ${!note ? "coverage_note" : ""}${!note && !hintsDeclared ? " 与 " : ""}${!hintsDeclared ? "cross_hints" : ""}`);
   }
   check("G10 扫描组完整", problems.length === 0, problems.join("；") || `${required.length} 组齐全`);
 }
@@ -230,21 +274,74 @@ const verdict = readJson(join(dir, "08-verdict.json"));
   if (plan.tier !== "quick") {
     if (!verdict?.stats) problems.push("08-verdict.json 缺 stats");
     else {
+      const defenses = def?.defenses || [];
       const recomputed = {
         accusations: acc?.accusations?.length ?? 0,
         upheld: (verdict.verdicts || []).filter((v) => v.decision === "upheld").length,
         dismissed: (verdict.verdicts || []).filter((v) => v.decision === "dismissed").length,
-        unresolved: (verdict.verdicts || []).filter((v) => v.decision === "unresolved").length
+        unresolved: (verdict.verdicts || []).filter((v) => v.decision === "unresolved").length,
+        defended: defenses.length,
+        valid_defense: defenses.filter((d) => d.claim === "valid_defense").length
       };
       for (const [k, v] of Object.entries(recomputed)) {
         if (verdict.stats[k] !== v) problems.push(`stats.${k}=${verdict.stats[k]} 与实际 ${v} 不符`);
       }
+      if (typeof verdict.stats.defended !== "number") problems.push("stats 缺 defended（有效辩护率分母）");
     }
     if (report) {
       for (const k of ["成立率", "有效辩护率", "升级率", "未决率"]) if (!report.includes(k)) problems.push(`报告未披露 ${k}`);
     } else problems.push("缺 REPORT.md");
   }
   check("G12 对抗指标", problems.length === 0, problems.join("；") || "四指标由 stats 计算并已披露");
+}
+
+// G14 交付物（closed 时）
+{
+  if (state.state !== "closed") {
+    check("G14 交付物", true, "未 closed，跳过", false);
+  } else {
+    const rep = state.report || {};
+    const root = state.root ? state.root : ".";
+    const files = rep.files || [];
+    const problems = [];
+    if (!rep.dir) problems.push("state.report.dir 为空");
+    if (!files.length) problems.push("state.report.files 为空");
+    for (const f of files) {
+      const p = join(root, rep.dir || "", f);
+      if (!existsSync(p)) problems.push(`缺交付文件：${p}`);
+    }
+    if (existsSync(join(dir, "REPORT.md")) && files.includes("REPORT.md") && existsSync(join(root, rep.dir, "REPORT.md"))) {
+      if (readFileSync(join(dir, "REPORT.md"), "utf8") !== readFileSync(join(root, rep.dir, "REPORT.md"), "utf8")) {
+        problems.push("交付目录的 REPORT.md 与工作目录不一致");
+      }
+    }
+    check("G14 交付物", problems.length === 0, problems.join("；") || `${files.length} 份报告已交付`);
+  }
+}
+
+// G18 结论一致性：写"通过/有条件通过"但仍有 P0，即结论与数据矛盾
+{
+  const report = read(join(dir, "REPORT.md")) || "";
+  const m = report.match(/Gate\s*[DI]\s*结论[：:]\s*(通过|有条件通过|不通过)/);
+  const p0 = (verdict?.verdicts || []).filter((v) => v.decision === "upheld" && v.level === "P0").length;
+  if (!m) check("G18 结论一致性", true, "未找到 Gate 结论，跳过", false);
+  else check("G18 结论一致性", m[1] === "不通过" || p0 === 0,
+    m[1] === "不通过" ? "结论为不通过" : p0 === 0 ? `结论 ${m[1]}，P0=0` : `结论 ${m[1]} 但 P0=${p0}`);
+}
+
+// G19 子模块体检（impl）
+{
+  if (plan.review_type !== "impl") check("G19 子模块体检", true, "设计侧不适用", false);
+  else {
+    const pf = readJson(join(dir, "preflight.json"));
+    if (!pf) check("G19 子模块体检", true, "无 preflight.json，跳过", false);
+    else {
+      const failed = (pf.failures || []).length;
+      const declared = Boolean(state.declared_impact);
+      check("G19 子模块体检", failed === 0 || declared,
+        failed ? `${failed} 项体检失败${declared ? "（已声明影响）" : "，且未声明影响"}` : "子模块均检出");
+    }
+  }
 }
 
 // 汇总

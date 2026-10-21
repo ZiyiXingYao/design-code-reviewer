@@ -142,6 +142,8 @@ export function validateBatchPayload(payload, planned) {
 
 /** 写一批：校验 -> tmp -> fsync -> rename -> 日志 -> 汇总 */
 export function commitBatch(dir, { payload, agent = "", ms = 0 }) {
+  const current = loadState(dir);
+  if (current.state === "closed") throw new Error("评审已 closed，拒绝写入；要修结论请开新一轮");
   const plan = loadPlan(dir);
   const planned = planBatchById(plan, payload.batch);
   if (!planned) throw new Error(`批 ${payload.batch} 不在 plan.json 中；开跑后不允许新增批次`);
@@ -151,6 +153,8 @@ export function commitBatch(dir, { payload, agent = "", ms = 0 }) {
 
   const target = join(dir, "batches", `${payload.batch}.json`);
   atomicWriteJson(target, payload);
+  const partialFile = join(dir, "batches", `${payload.batch}.partial.json`);
+  if (existsSync(partialFile)) rmSync(partialFile, { force: true });
 
   appendProgress(dir, {
     batch: payload.batch, group: payload.group, status: payload.status,
@@ -183,13 +187,57 @@ export function reconcile(dir) {
       // 解析失败视同无产物
     }
   }
+  const partialDetails = [];
   for (const name of files) {
-    if (name.endsWith(".partial.json")) partial.push(name);
+    if (!name.endsWith(".partial.json")) continue;
+    partial.push(name);
+    try {
+      const j = JSON.parse(readFileSync(join(dir, "batches", name), "utf8"));
+      const filled = j.filled_cells || [];
+      partialDetails.push({
+        batch: j.batch || name.replace(".partial.json", ""),
+        filled: filled.length,
+        next_cell: `#${filled.length + 1}`,
+        partial_findings: (j.partial_findings || []).length
+      });
+    } catch { /* 损坏的 partial 只列出文件名 */ }
   }
 
+  const entries = readProgress(dir);
   // 任何日志痕迹（含心跳 running）都算"该批启动过"；产物缺失即判丢弃重跑
-  const logged = new Set(readProgress(dir).map((e) => e.batch).filter(Boolean));
-  const loggedDone = new Set(readProgress(dir).filter((e) => e.status === "done").map((e) => e.batch));
+  const logged = new Set(entries.map((e) => e.batch).filter(Boolean));
+  const loggedDone = new Set(entries.filter((e) => e.status === "done").map((e) => e.batch));
+
+  // 心跳超时（3 个周期 = 180s）与单批超时（10 分钟）
+  const now = Date.now();
+  const HEARTBEAT_TIMEOUT = 3 * 60 * 1000;
+  const BATCH_TIMEOUT = 10 * 60 * 1000;
+  const lastBeat = new Map();
+  const firstSeen = new Map();
+  for (const e of entries) {
+    if (!e.batch || !e.ts) continue;
+    const t = Date.parse(e.ts);
+    if (Number.isNaN(t)) continue;
+    if (!firstSeen.has(e.batch)) firstSeen.set(e.batch, t);
+    lastBeat.set(e.batch, Math.max(lastBeat.get(e.batch) || 0, t));
+  }
+  const stalled = new Set();
+  for (const [id, t] of lastBeat) {
+    if (present.has(id)) continue;
+    const age = now - t;
+    const total = now - (firstSeen.get(id) || t);
+    if (age > HEARTBEAT_TIMEOUT || total > BATCH_TIMEOUT) stalled.add(id);
+  }
+
+  // 产物被改动（progress.log 的 sha256 与实际文件不符）
+  const tampered = new Set();
+  const shaByBatch = new Map(entries.filter((e) => e.sha256).map((e) => [e.batch, e.sha256]));
+  for (const [id] of present) {
+    const expected = shaByBatch.get(id);
+    if (!expected) continue;
+    const file = join(dir, "batches", `${id}.json`);
+    if (existsSync(file) && sha256File(file) !== expected) tampered.add(id);
+  }
 
   const done = [];
   const pending = [];
@@ -197,11 +245,15 @@ export function reconcile(dir) {
   const skipped = [];
   for (const b of planned) {
     const p = present.get(b.id);
-    if (p && (p.status === "done" || p.status === "skipped")) {
+    if (tampered.has(b.id)) {
+      discarded.push(b.id);
+      present.delete(b.id);
+    } else if (p && (p.status === "done" || p.status === "skipped")) {
       done.push(b.id);
       if (p.status === "skipped") skipped.push(b.id);
     } else if (p && p.status === "failed") {
       discarded.push(b.id);
+      present.delete(b.id);
     } else {
       pending.push(b.id);
     }
@@ -214,10 +266,14 @@ export function reconcile(dir) {
       if (!discarded.includes(id)) discarded.push(id);
     }
   }
+  for (const id of stalled) {
+    if (planned.some((b) => b.id === id) && !discarded.includes(id)) discarded.push(id);
+  }
 
   const coverage = computeCoverage(plan, [...present.values()]);
   const state = buildState(dir, plan, {
-    done, pending, discarded, skipped, coverage, partial,
+    done, pending, discarded, skipped, coverage, partial, partialDetails,
+    stalled: [...stalled], tampered: [...tampered],
     progressMissing: done.filter((id) => !loggedDone.has(id))
   });
   return state;
@@ -258,6 +314,8 @@ function buildState(dir, plan, extra) {
   const state = {
     schema_version: SCHEMA_VERSION,
     review_type: plan.review_type,
+    review_id: prev.review_id || basename(dir),
+    root: prev.root || "",
     tier: plan.tier,
     dir,
     baseline: prev.baseline || {},
@@ -270,6 +328,7 @@ function buildState(dir, plan, extra) {
     state: prev.state || "scoped",
     steps: prev.steps || {},
     coverage: extra.coverage,
+    report: prev.report || { dir: "", files: [] },
     adversarial: prev.adversarial || { rounds: 0, agents: [] },
     interruptions: prev.interruptions || [],
     recovery: {
@@ -279,12 +338,15 @@ function buildState(dir, plan, extra) {
       discarded: extra.discarded.length,
       skipped: extra.skipped.length,
       partial: extra.partial,
+      partial_batches: extra.partialDetails || [],
+      stalled: extra.stalled || [],
+      tampered: extra.tampered || [],
       progress_missing: extra.progressMissing
     },
     batches,
     log: prev.log || []
   };
-  return { state, done: extra.done, pending: extra.pending, discarded: extra.discarded, skipped: extra.skipped, coverage: extra.coverage };
+  return { state, done: extra.done, pending: extra.pending, discarded: extra.discarded, skipped: extra.skipped, coverage: extra.coverage, partial: extra.partialDetails || [] };
 }
 
 export function initReview(dir, opts) {
@@ -296,7 +358,8 @@ export function initReview(dir, opts) {
     created_at: new Date().toISOString(),
     expected: opts.expected || {},
     steps: opts.steps || [],
-    batches: opts.batches || []
+    batches: opts.batches || [],
+    ...(opts.planExtra || {})
   };
   if (!plan.batches.length) throw new Error("plan 必须至少包含一个批次");
   for (const b of plan.batches) {
@@ -313,6 +376,8 @@ export function initReview(dir, opts) {
   const state = {
     schema_version: SCHEMA_VERSION,
     review_type: opts.type,
+    review_id: opts.reviewId || basename(dir),
+    root: opts.root || "",
     tier: plan.tier,
     dir,
     baseline: {
@@ -328,6 +393,7 @@ export function initReview(dir, opts) {
     adversarial: { rounds: 0, agents: [], stats: { accusations: 0, upheld: 0, dismissed: 0, unresolved: 0, valid_defense: 0, escalated: 0 } },
     interruptions: [],
     recovery: { last_run: new Date().toISOString(), done: 0, pending: plan.batches.length, discarded: 0, skipped: 0, partial: [], progress_missing: [] },
+    report: { dir: "", files: [] },
     batches: plan.batches.map((b) => ({ id: b.id, group: b.group, unit: b.unit, kind: b.kind, status: "pending", findings: 0 })),
     log: [{ at: new Date().toISOString(), from: "", to: "scoped", reason: "init" }]
   };

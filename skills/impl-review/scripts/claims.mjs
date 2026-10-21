@@ -55,10 +55,13 @@ for (const name of readdirSync(designDir).filter((n) => n.endsWith(".md")).sort(
   let inFence = false;
   let tableNo = 0;
   let tableCol = [];
+  let heading = "";
 
   lines.forEach((line, i) => {
     if (/^\s*```/.test(line)) { inFence = !inFence; return; }
     if (inFence) return;
+    const h = line.match(/^#{2,4}\s+(.+)$/);
+    if (h) heading = h[1];
 
     // 行内代码
     for (const m of line.matchAll(/`([^`]{2,80})`/g)) {
@@ -84,7 +87,7 @@ for (const name of readdirSync(designDir).filter((n) => n.endsWith(".md")).sort(
         }
         for (const c of cells) {
           if (/^[A-Za-z_][\w.:/-]*$/.test(c) && c.length >= 3 && !STOP.has(c.toLowerCase())) {
-            assertions.push({ doc: name, line: i + 1, token: c, kind: "cell" });
+            assertions.push({ doc: name, line: i + 1, token: c, kind: heading.includes("状态机") ? "state" : "cell" });
           }
         }
       }
@@ -92,6 +95,40 @@ for (const name of readdirSync(designDir).filter((n) => n.endsWith(".md")).sort(
       if (tableCol.length) { tableCol = []; tableNo++; }
     }
   });
+}
+
+// 时序图：把节点里的调用/标签当作“调用顺序”断言
+const diagramsDir = join(designDir, "diagrams");
+if (existsSync(diagramsDir)) {
+  for (const name of readdirSync(diagramsDir).filter((n) => n.endsWith(".json"))) {
+    try {
+      const j = JSON.parse(readFileSync(join(diagramsDir, name), "utf8"));
+      const nodes = Array.isArray(j.nodes) ? j.nodes : Array.isArray(j.steps) ? j.steps : [];
+      for (const n of nodes) {
+        const label = n.call || n.label || n.name;
+        if (typeof label !== "string") continue;
+        for (const m of label.matchAll(/\b([A-Z][A-Za-z0-9_]{2,})\b/g)) {
+          assertions.push({ doc: `diagrams/${name}`, line: 0, token: m[1], kind: "call" });
+        }
+      }
+    } catch { /* 非标准图结构跳过 */ }
+  }
+}
+
+// 交接块：C-n 设计约束纳入断言集（不可机械匹配，标 unverifiable）
+const auditRoot = join(root, "specs", "audit");
+if (existsSync(auditRoot)) {
+  for (const d of readdirSync(auditRoot)) {
+    const rp = join(auditRoot, d, "REPORT.md");
+    if (!existsSync(rp)) continue;
+    const text = readFileSync(rp, "utf8");
+    const idx = text.indexOf("## 交接块");
+    if (idx < 0) continue;
+    for (const line of text.slice(idx).split("\n")) {
+      const m = line.match(/^-\s*(C-\d+)\s*[：:]?\s*(.+)$/);
+      if (m) assertions.push({ doc: "交接块", line: 0, token: `${m[1]} ${m[2]}`.slice(0, 120), kind: "constraint", manual: true });
+    }
+  }
 }
 
 // 去重
@@ -131,21 +168,24 @@ function probes(tok, kind) {
 }
 
 const results = uniq.map((a) => {
-  const kind = kindOf(a.token);
+  const kind = ["constraint", "call", "state"].includes(a.kind) ? a.kind : kindOf(a.token);
+  if (kind === "constraint") {
+    return { ...a, kind, found: false, unverifiable: true, file: null, probe: null, note: "C-n 约束需人工核" };
+  }
   let hit = null;
   let used = null;
   for (const probe of probes(a.token, kind)) {
     hit = corpus.find((c) => c.text.includes(probe));
     if (hit) { used = probe; break; }
   }
-  return { ...a, kind, found: Boolean(hit), file: hit ? hit.file : null, probe: used };
+  return { ...a, kind, found: Boolean(hit), unverifiable: false, file: hit ? hit.file : null, probe: used };
 });
 
 const summary = {};
 for (const r of results) {
   summary[r.kind] ||= { total: 0, found: 0, missing: 0, unverifiable: 0 };
   summary[r.kind].total++;
-  if (r.found) summary[r.kind].found++; else summary[r.kind].missing++;
+  if (r.found) summary[r.kind].found++; else if (r.unverifiable) summary[r.kind].unverifiable++; else summary[r.kind].missing++;
 }
 
 // 编号跳号（去掉内部标记）
@@ -166,7 +206,7 @@ const out = {
   assertions: results,
   summary,
   numbering_gaps: realGaps,
-  note: "本版本只产出 found/missing；unverifiable 预留给需要语义判断的断言（由人工填写），不参与机械统计。missing 必须人工归为 真缺失/改名未回写/表达差异"
+  note: "found/missing 为机械匹配；constraint（交接块 C-n）永不参与机械匹配，统一记 unverifiable。missing 必须人工归为 真缺失/改名未回写/表达差异"
 };
 
 if (outFile) writeFileSync(outFile, JSON.stringify(out, null, 2) + "\n");

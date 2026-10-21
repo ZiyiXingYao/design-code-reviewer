@@ -43,8 +43,8 @@ function loadArchState() {
   try {
     const s = parseYaml(readFileSync(p, "utf8"));
     return {
-      present: true, state: s.state, schema_version: s.schema_version,
-      files: s.files || [], reopens: s.reopens || [], change_list: s.change_list || {}
+      present: true, raw: s, state: s.state, schema_version: s.schema_version,
+      files: s.files, reopens: s.reopens, change_list: s.change_list || {}
     };
   } catch (err) {
     return { present: true, error: err.message };
@@ -84,11 +84,20 @@ const arch = loadArchState();
 if (!arch.present) problems.push("缺 .brainstorming-archify/state.yaml");
 else if (arch.error) problems.push(`state.yaml 解析失败：${arch.error}`);
 else {
+  // 方案 §2.4.3：四个必需字段缺任一都要显式告警，不得静默兜底
+  for (const key of ["schema_version", "state", "files", "reopens"]) {
+    if (arch.raw?.[key] === undefined || arch.raw?.[key] === null) warnings.push(`state.yaml 缺必需字段 ${key}`);
+  }
   if (arch.schema_version !== 1) warnings.push(`state.yaml schema_version=${arch.schema_version}（期望 1）`);
   if (!arch.change_list?.path) warnings.push("state.yaml 未登记 change_list.path");
   else {
     const clp = join(root, arch.change_list.path);
     if (!existsSync(clp)) problems.push(`change_list 指向的文件不存在：${arch.change_list.path}`);
+    else {
+      const text = readFileSync(clp, "utf8");
+      if (!/^##\s*关键决策/m.test(text)) warnings.push("change-list 缺「关键决策」段");
+      if (!/\bD-?\d+\b/.test(text)) warnings.push("change-list 未见 D-nnn 决策编号");
+    }
   }
 }
 
