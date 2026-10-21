@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { initReview, updateState } from "../skills/design-review/scripts/lib/review-state.mjs";
@@ -105,4 +105,15 @@ test("G15：closed 但未同步账本时 gate 拒绝", () => {
   const g15 = j.results.find((x) => x.id.startsWith("G15"));
   assert.equal(g15.ok, false);
   assert.match(g15.detail, /未同步/);
+});
+
+test("账本 history 以对象落盘可回读", () => {
+  const r = root();
+  const d = review(r, "2026-01-01-design", [f("F-001", "路径未校验", "a.md:1")]);
+  syncForReview(r, d);
+  const raw = readFileSync(join(r, ".design-code-reviewer", "ledger.yaml"), "utf8");
+  assert.doesNotMatch(raw, /\[object Object\]/);
+  assert.match(raw, /action: "open"/);
+  const e = loadLedger(r).entries[0];
+  assert.equal(e.history[0].action, "open");
 });

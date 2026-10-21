@@ -149,7 +149,20 @@ function emit(obj, indent, out) {
               if (iv.length === 0) out.push(`${prefix}${ik}: []`);
               else {
                 out.push(`${prefix}${ik}:`);
-                for (const x of iv) out.push(`${pad}      - ${scalar(x)}`);
+                for (const x of iv) {
+                  if (x !== null && typeof x === "object") {
+                    const es = Object.entries(x).filter(([, v]) => v !== undefined);
+                    es.forEach(([k2, v2], i2) => {
+                      const pfx = i2 === 0 ? `${pad}      - ` : `${pad}        `;
+                      if (v2 !== null && typeof v2 === "object" && !Array.isArray(v2)) {
+                        out.push(`${pfx}${k2}:`);
+                        emit(v2, indent + 10, out);
+                      } else if (Array.isArray(v2)) {
+                        out.push(`${pfx}${k2}: []`);
+                      } else out.push(`${pfx}${k2}: ${scalar(v2)}`);
+                    });
+                  } else out.push(`${pad}      - ${scalar(x)}`);
+                }
               }
             } else out.push(`${prefix}${ik}: ${scalar(iv)}`);
           });
@@ -170,7 +183,7 @@ function emit(obj, indent, out) {
 }
 
 export function stringifyYaml(obj) {
-  const out = ["# 本文件只允许由 scripts/state.mjs 编辑，手工修改视为无效"];
+  const out = ["# 本文件只允许由对应脚本编辑（state.mjs / ledger.mjs），手工修改视为无效"];
   emit(obj, 0, out);
   return out.join("\n") + "\n";
 }
