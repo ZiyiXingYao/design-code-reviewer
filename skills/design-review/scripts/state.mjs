@@ -14,8 +14,9 @@
  *   state.mjs show <dir>
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
+import { auditDir, makeReviewId, rel, workDir } from "./lib/layout.mjs";
 import {
   addLog, commitBatch, initReview, loadState, reconcile, saveState, updateState,
   appendProgress, computeCoverage, loadPlan, loadBatches
@@ -46,12 +47,16 @@ if (cmd !== "init" && !dir) fail("缺少评审目录");
 
 switch (cmd) {
   case "init": {
-    if (!dir) fail("缺少评审目录");
     if (!args.type) fail("缺少 --type");
     if (!args.plan) fail("缺少 --plan（批次计划 JSON）");
+    const root = resolve(args._[0] || ".");
+    const id = args.id || makeReviewId(root, args.type);
+    const reviewDir = workDir(root, id);
     const spec = JSON.parse(readFileSync(resolve(args.plan), "utf8"));
-    const state = initReview(dir, {
+    const state = initReview(reviewDir, {
       type: args.type,
+      reviewId: id,
+      root,
       tier: args.tier || "standard",
       maxConcurrency: args["max-concurrency"] ? Number(args["max-concurrency"]) : 4,
       expected: spec.expected || {},
@@ -62,7 +67,7 @@ switch (cmd) {
       reopen: args.reopen ? Number(args.reopen) : 0,
       bench: args.bench || ""
     });
-    console.log(JSON.stringify({ ok: true, dir, batches: state.plan.total_batches }, null, 2));
+    console.log(JSON.stringify({ ok: true, review_id: id, dir: reviewDir, audit: auditDir(root, id), batches: state.plan.total_batches }, null, 2));
     break;
   }
   case "recover": {
@@ -86,6 +91,7 @@ switch (cmd) {
   }
   case "step": {
     if (!args.id || !args.status) fail("缺少 --id / --status");
+    if (loadState(dir).state === "closed") fail("评审已 closed，拒绝写入");
     const s = updateState(dir, (st) => {
       const cur = st.steps[args.id] || {};
       const next = { ...cur, status: args.status, at: new Date().toISOString() };
@@ -162,6 +168,30 @@ switch (cmd) {
     console.log(`已记录中断 ${args.batch}（共 ${s.interruptions.length}）`);
     break;
   }
+  case "promote": {
+    const st = loadState(dir);
+    if (st.state === "closed") fail("评审已 closed，无需重复 promote");
+    const gateFile = join(dir, "gate-result.md");
+    if (!existsSync(gateFile)) fail("缺 gate-result.md，请先运行 gate.mjs");
+    const gateText = readFileSync(gateFile, "utf8");
+    if (!/结论：通过/.test(gateText)) fail("gate 未通过，拒绝 promote");
+    const reports = ["REPORT.md", "SUMMARY.md"];
+    for (const f of reports) {
+      const fp = join(dir, f);
+      if (!existsSync(fp) || statSync(fp).size === 0) fail(`缺少或为空：${f}`);
+    }
+    const root = st.root ? resolve(st.root) : resolve(".");
+    const out = args.out ? resolve(args.out) : auditDir(root, st.review_id || basename(dir));
+    mkdirSync(out, { recursive: true });
+    for (const f of reports) copyFileSync(join(dir, f), join(out, f));
+    updateState(dir, (s) => {
+      s.report = { dir: rel(root, out), files: reports };
+      addLog(s, "closed", "promote 完成，报告已交付");
+    });
+    console.log(JSON.stringify({ ok: true, audit: out, files: reports }, null, 2));
+    break;
+  }
+
   case "show": {
     const st = loadState(dir);
     const plan = loadPlan(dir);

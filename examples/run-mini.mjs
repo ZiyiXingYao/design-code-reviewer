@@ -18,8 +18,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  initReview, commitBatch, updateState, saveState, loadState
+  initReview, commitBatch, updateState, loadState
 } from "../skills/design-review/scripts/lib/review-state.mjs";
+import { auditDir, makeReviewId, workDir } from "../skills/design-review/scripts/lib/layout.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const node = process.execPath;
@@ -49,7 +50,8 @@ const smells = JSON.parse(sm.stdout);
 console.log(`信号 ${smells.signals.length} 组`);
 
 console.log("\n== 4. 状态机 ==");
-const review = join(tmp, "review");
+const reviewId = makeReviewId(project, "design");
+const review = workDir(project, reviewId);
 const plan = {
   expected: { dimension: 1 },
   steps: ["A0"],
@@ -57,7 +59,8 @@ const plan = {
 };
 writeFileSync(join(tmp, "plan.json"), JSON.stringify(plan, null, 2));
 initReview(review, {
-  type: "design", tier: "standard", expected: plan.expected, steps: plan.steps,
+  type: "design", reviewId, root: project, tier: "standard",
+  expected: plan.expected, steps: plan.steps,
   batches: plan.batches, commit: "example", designState: "closed", reopen: 0
 });
 updateState(review, (st) => { st.steps.A0 = { status: "done", at: new Date().toISOString() }; });
@@ -140,5 +143,14 @@ console.log("\n== 5. 闸门 ==");
 const gate = run("skills/design-review/scripts/gate.mjs", [review]);
 console.log(gate.stdout.trim());
 console.log(`gate 退出码 ${gate.status}（0=通过）`);
-console.log(`\n临时目录：${tmp}`);
-process.exit(gate.status === 0 ? 0 : 1);
+if (gate.status !== 0) process.exit(1);
+
+console.log("\n== 6. 交付 ==");
+const promoted = run("skills/design-review/scripts/state.mjs", ["promote", review]);
+if (promoted.status !== 0) { console.error(promoted.stderr); process.exit(1); }
+console.log(promoted.stdout.trim());
+
+console.log(`\n工作目录：${review}`);
+console.log(`交付目录：${auditDir(project, reviewId)}`);
+console.log(`临时根目录：${tmp}`);
+process.exit(0);

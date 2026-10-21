@@ -68,22 +68,31 @@ L0 仍是完整评审（19 个镜头全跑），只是不做设计对照；但**
 
 ## 状态与闸门
 
-每次评审一个目录：
+每次评审一个工作目录 + 一个交付目录：
 
 ```
-<reviewDir>/
+<project>/.design-code-reviewer/<YYYY-MM-DD>-<design|impl>/   # 工作目录
+├── state.yaml           # 唯一权威，只由 state.mjs / resume.mjs 写
 ├── plan.json            # 批次计划，开跑前写死
-├── state.yaml           # 只由 state.mjs 写
 ├── progress.log         # 心跳与完成记录
 ├── batches/*.json       # 内容权威（tmp → fsync → rename）
+├── 00-*.md … 05-*.md    # 聚合中间件
 ├── 06/07/08.json        # 指控 / 辩护 / 裁断
-├── gate-result.md
+└── gate-result.md
+
+<project>/specs/audit/<YYYY-MM-DD>-<design|impl>/             # 交付目录
 ├── REPORT.md            # 11 节，含全部证据
 └── SUMMARY.md           # ≤2 页，含"最该关心的三件事"
 ```
 
-- 权威顺序：**批产物 > 日志 > state**；崩溃后 `recover` 自动对账并丢弃"有日志无产物"的批。
-- `gate.mjs` 在出报告前校验覆盖度、对抗完整性、基准标注、可追溯性；不通过只能出 `DRAFT`。
+- 权威顺序：**批产物 > 日志 > state**；崩溃后 `resume` 自动对账并丢弃"有日志无产物"的批。
+- `gate.mjs` 在出报告前校验覆盖度、对抗完整性、基准标注、可追溯性；不通过只能出 `DRAFT`，也不许 `promote`。
+- `state.mjs promote` 才复制报告到 `specs/audit/` 并置 `closed`；此后工作目录只读。
+- 中断恢复：`node <skill>/scripts/resume.mjs <project> --list`；无参数时唯一未完成直接恢复、多个要求 `--id` 选择。
+
+## 版本
+
+- 0.2.0：评审产物分层（工作目录 / 交付目录）、`resume` 命令、`promote` 交付；**破坏性变更**——0.1 的 `specs/audit/<date>/state.yaml` 不再作为工作状态，旧报告只作历史。
 
 ## 评价指标（怎么知道它有效）
 

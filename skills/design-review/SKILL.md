@@ -82,38 +82,52 @@ node <skill-root>/scripts/docstat.mjs <projectRoot> [--json]
 ## 5 状态与落盘（唯一入口）
 
 ```
-node <skill-root>/scripts/state.mjs init <reviewDir> --type design --plan <plan.json>
-node <skill-root>/scripts/state.mjs recover <reviewDir>
+# 开一轮（自动生成 id：<YYYY-MM-DD>-design；同日同类型自动 -2）
+node <skill-root>/scripts/state.mjs init <projectRoot> --type design --plan <plan.json> [--id <id>]
+
+# 落盘与进度
 node <skill-root>/scripts/state.mjs batch <reviewDir> --payload <b01.json> --agent sub-a01 --ms 142000
 node <skill-root>/scripts/state.mjs heartbeat <reviewDir> --id b07 --beat 3
 node <skill-root>/scripts/state.mjs step <reviewDir> --id A2 --status running --done 7 --total 15
 node <skill-root>/scripts/state.mjs agent <reviewDir> --role scout-s1 --agent-id sub-a01 --findings 4 --coverage-note "…"
 node <skill-root>/scripts/state.mjs stats <reviewDir> --accusations 27 --upheld 12 --dismissed 9 --unresolved 6 --valid-defense 8
 node <skill-root>/scripts/state.mjs transition <reviewDir> reported --reason "A6 完成"
+
+# 闸门与交付（gate 通过后 promote 才复制报告并 closed）
 node <skill-root>/scripts/gate.mjs <reviewDir>
+node <skill-root>/scripts/state.mjs promote <reviewDir>
+
+# 中断恢复（扫描 .design-code-reviewer/*-design/state.yaml，按 mtime 倒序）
+node <skill-root>/scripts/resume.mjs <projectRoot> --list
+node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 ```
 
 - **权威顺序**：`batches/*.json` > `progress.log` > `state.yaml`。state 只是汇总缓存，损坏可重建。
 - 批写入是 `tmp → fsync → rename`；不要手写 `batches/`，一律走 `state.mjs batch`。
-- 中断后：`recover` 会清理 `*.tmp`、丢弃"有日志无产物"的批、列出待跑批。
-- **gate 不通过不许出报告**；此时报告只能标 `DRAFT`。
+- 中断后：`resume` 会清理 `*.tmp`、丢弃"有日志无产物"的批、重算覆盖并输出下一批。
+- **gate 不通过不许出报告，也不许 promote**；此时报告只能标 `DRAFT`。
+- `promote` 之后 `state=closed`，该目录拒绝再写入；要改结论请开新一轮。
 
 ## 6 目录
 
 ```
-specs/audit/<YYYY-MM-DD>-design/
+<projectRoot>/.design-code-reviewer/<YYYY-MM-DD>-design/   # 工作目录（中间产物，只读保留）
+├── state.yaml           # 唯一权威，只由 state.mjs/resume.mjs 写
 ├── plan.json            # 批次计划（开跑前写死）
-├── state.yaml           # 只由 state.mjs 写
 ├── progress.log         # JSONL，每批一行
 ├── batches/b01.json …   # 内容权威
 ├── 00-baseline.md … 05-findings.md
 ├── 06-accusations.json / 07-defense.json / 08-verdict.json
 ├── gate-result.md
+├── REPORT.md            # 工作副本
+└── SUMMARY.md           # 工作副本
+
+<projectRoot>/specs/audit/<YYYY-MM-DD>-design/            # 交付目录（只放成品）
 ├── REPORT.md            # 11 节 + 交接块
 └── SUMMARY.md           # ≤2 页
 ```
 
-报告是聚合物：每节都能追溯到批产物；不要自由发挥。
+报告是聚合物：每节都能追溯到批产物；不要自由发挥。交付目录只有两个文件，证据仍在工作目录，报告用路径引用。
 
 ## 7 判据索引
 

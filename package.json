@@ -1,6 +1,6 @@
 {
   "name": "design-code-reviewer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "CodeBuddy skills: design review for brainstorming-archify docs, and implementation review against those designs",

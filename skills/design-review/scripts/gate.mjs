@@ -247,6 +247,30 @@ const verdict = readJson(join(dir, "08-verdict.json"));
   check("G12 对抗指标", problems.length === 0, problems.join("；") || "四指标由 stats 计算并已披露");
 }
 
+// G14 交付物（closed 时）
+{
+  if (state.state !== "closed") {
+    check("G14 交付物", true, "未 closed，跳过", false);
+  } else {
+    const rep = state.report || {};
+    const root = state.root ? state.root : ".";
+    const files = rep.files || [];
+    const problems = [];
+    if (!rep.dir) problems.push("state.report.dir 为空");
+    if (!files.length) problems.push("state.report.files 为空");
+    for (const f of files) {
+      const p = join(root, rep.dir || "", f);
+      if (!existsSync(p)) problems.push(`缺交付文件：${p}`);
+    }
+    if (existsSync(join(dir, "REPORT.md")) && files.includes("REPORT.md") && existsSync(join(root, rep.dir, "REPORT.md"))) {
+      if (readFileSync(join(dir, "REPORT.md"), "utf8") !== readFileSync(join(root, rep.dir, "REPORT.md"), "utf8")) {
+        problems.push("交付目录的 REPORT.md 与工作目录不一致");
+      }
+    }
+    check("G14 交付物", problems.length === 0, problems.join("；") || `${files.length} 份报告已交付`);
+  }
+}
+
 // 汇总
 const blocking = results.filter((r) => r.blocking);
 const passed = blocking.every((r) => r.ok);

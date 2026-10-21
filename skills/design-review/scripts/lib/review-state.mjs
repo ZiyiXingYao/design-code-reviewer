@@ -142,6 +142,8 @@ export function validateBatchPayload(payload, planned) {
 
 /** 写一批：校验 -> tmp -> fsync -> rename -> 日志 -> 汇总 */
 export function commitBatch(dir, { payload, agent = "", ms = 0 }) {
+  const current = loadState(dir);
+  if (current.state === "closed") throw new Error("评审已 closed，拒绝写入；要修结论请开新一轮");
   const plan = loadPlan(dir);
   const planned = planBatchById(plan, payload.batch);
   if (!planned) throw new Error(`批 ${payload.batch} 不在 plan.json 中；开跑后不允许新增批次`);
@@ -258,6 +260,8 @@ function buildState(dir, plan, extra) {
   const state = {
     schema_version: SCHEMA_VERSION,
     review_type: plan.review_type,
+    review_id: prev.review_id || basename(dir),
+    root: prev.root || "",
     tier: plan.tier,
     dir,
     baseline: prev.baseline || {},
@@ -270,6 +274,7 @@ function buildState(dir, plan, extra) {
     state: prev.state || "scoped",
     steps: prev.steps || {},
     coverage: extra.coverage,
+    report: prev.report || { dir: "", files: [] },
     adversarial: prev.adversarial || { rounds: 0, agents: [] },
     interruptions: prev.interruptions || [],
     recovery: {
@@ -313,6 +318,8 @@ export function initReview(dir, opts) {
   const state = {
     schema_version: SCHEMA_VERSION,
     review_type: opts.type,
+    review_id: opts.reviewId || basename(dir),
+    root: opts.root || "",
     tier: plan.tier,
     dir,
     baseline: {
@@ -328,6 +335,7 @@ export function initReview(dir, opts) {
     adversarial: { rounds: 0, agents: [], stats: { accusations: 0, upheld: 0, dismissed: 0, unresolved: 0, valid_defense: 0, escalated: 0 } },
     interruptions: [],
     recovery: { last_run: new Date().toISOString(), done: 0, pending: plan.batches.length, discarded: 0, skipped: 0, partial: [], progress_missing: [] },
+    report: { dir: "", files: [] },
     batches: plan.batches.map((b) => ({ id: b.id, group: b.group, unit: b.unit, kind: b.kind, status: "pending", findings: 0 })),
     log: [{ at: new Date().toISOString(), from: "", to: "scoped", reason: "init" }]
   };

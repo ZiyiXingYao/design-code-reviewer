@@ -84,17 +84,25 @@ DR-1 无实现 / DR-2 改名未回写 / DR-3 行为不符 / DR-4 残留 / DR-5 �
 ## 7 状态与落盘
 
 ```
+# 先开一轮，拿到 reviewDir（<projectRoot>/.design-code-reviewer/<YYYY-MM-DD>-impl/）
+node <skill-root>/scripts/state.mjs init <projectRoot> --type impl --plan <plan.json> [--bench L2] [--id <id>]
+
 node <skill-root>/scripts/preflight.mjs <projectRoot> [--require-design] --out <reviewDir>
 node <skill-root>/scripts/claims.mjs <projectRoot> --out <reviewDir>/claims.json
 node <skill-root>/scripts/smells.mjs <projectRoot> --json --out <reviewDir>/smells.json
-node <skill-root>/scripts/state.mjs init <reviewDir> --type impl --plan <plan.json> [--bench L2]
 node <skill-root>/scripts/state.mjs batch <reviewDir> --payload <b01.json> --agent sub-a01
-node <skill-root>/scripts/state.mjs recover <reviewDir>
 node <skill-root>/scripts/gate.mjs <reviewDir>
+node <skill-root>/scripts/state.mjs promote <reviewDir>
+
+# 中断恢复
+node <skill-root>/scripts/resume.mjs <projectRoot> --list
+node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 ```
 
 权威顺序：`batches/*.json` > `progress.log` > `state.yaml`。批写入走 `tmp→fsync→rename`。
-gate 不通过不许出报告（只能标 `DRAFT`）。
+gate 不通过不许出报告（只能标 `DRAFT`），也不许 promote。promote 后 `closed`，工作目录只读。
+
+中间产物在 `.design-code-reviewer/<YYYY-MM-DD>-impl/`；成品只把 `REPORT.md`、`SUMMARY.md` 放到 `specs/audit/<YYYY-MM-DD>-impl/`。
 
 ## 8 对抗
 
