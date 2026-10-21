@@ -9,7 +9,13 @@
  */
 
 const LEVEL_ORDER = { P0: 0, P1: 1, P2: 2, P3: 3 };
-const FILE_RE = /([\w./-]+\.(?:md|h|hpp|c|cc|cpp|mjs|js|ts|json|ya?ml|sql|proto))/;
+const FILE_RE = /([^\s;；,，()（）]+\.(?:md|h|hpp|c|cc|cpp|mjs|js|ts|json|ya?ml|sql|proto))/;
+const BRIEF_MAX = 360;
+
+function brief(s) {
+  const first = String(s || "").split(/；/)[0].trim();
+  return first.length > BRIEF_MAX ? first.slice(0, BRIEF_MAX) + "…" : first;
+}
 
 export function finalLevels(findings, verdicts, accusations) {
   const byAcc = new Map(verdicts.map((v) => [v.accusation_id, v]));
@@ -43,11 +49,11 @@ function promptFor(f, reviewType) {
   const design = isDesign(reviewType);
   const target = design ? "设计文档" : "代码";
   const verify = design
-    ? `反例不再成立：${f.counterexample || "（原反例缺失）"}；对应维度/场景复查通过；重跑 gate`
-    : `触发条件不再复现：${f.trigger || f.counterexample || "（原触发条件缺失）"}；相关测试与复跑通过`;
+    ? `反例不再成立：${brief(f.counterexample) || "（原反例缺失）"}；对应维度/场景复查通过；重跑 gate`
+    : `触发条件不再复现：${brief(f.trigger || f.counterexample) || "（原触发条件缺失）"}；相关测试与复跑通过`;
   return [
     `    - [实现的功能] 修复 ${f.id}：${f.title}`,
-    `    - [任务实现的要求] 修改 ${target} ${f.location}：${f.suggestion || f.mechanism}；消除机制「${f.mechanism}」`,
+    `    - [任务实现的要求] 修改 ${target} ${brief(f.location)}：${brief(f.suggestion || f.mechanism)}；消除机制「${brief(f.mechanism)}」`,
     `    - [实现的约束] 只改「涉及」列出的位置；不得改动其他任务的文件；不得改变设计/契约已定的其他行为`,
     `    - [验收标准] ${verify}`
   ].join("\n");
@@ -57,9 +63,9 @@ function taskBlock(t, reviewType) {
   const deps = t.dependsOn.length ? t.dependsOn.join("、") : "无";
   return [
     `- [ ] **${t.id} [${t.level}] ${t.finding.title}**（${t.finding.id}）`,
-    `  - 问题：${t.finding.mechanism}`,
-    `  - 怎么改：${t.finding.suggestion || "按发现描述修复"}`,
-    `  - 涉及：${t.finding.location}`,
+    `  - 问题：${brief(t.finding.mechanism)}`,
+    `  - 怎么改：${brief(t.finding.suggestion) || "按发现描述修复"}`,
+    `  - 涉及：${brief(t.finding.location)}`,
     `  - 依赖：${deps}`,
     "  - AI 提示词：",
     promptFor(t.finding, reviewType)
