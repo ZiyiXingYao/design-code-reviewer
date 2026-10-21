@@ -37,6 +37,7 @@ node <skill-root>/scripts/claims.mjs <projectRoot> --out <reviewDir>/claims.json
 - `found`：在代码中找到同名符号/字面量（区分大小写与命名族）。
 - `missing`：全仓无匹配 → 必须人工归为「真缺失 / 改名未回写 / 表达差异」。
 - `unverifiable`：文档表述无法机械匹配（如"由插件负责"）→ 不计入统计，列入附录。
+  当前 `claims.mjs` 只产出 found/missing；需要语义判断的断言由评审者人工补 `unverifiable` 并说明理由。
 
 ## 4 实测基线（用于校准期望值）
 

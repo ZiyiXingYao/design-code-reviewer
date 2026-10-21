@@ -21,7 +21,7 @@ function usage() {
   console.log(`用法: node install.mjs [--dry-run] [--force] [--dest <dir>] [--uninstall]`);
   console.log("  --dest <dir>   安装目标根目录，默认 ~/.codebuddy/skills");
   console.log("  --dry-run      只打印计划，不写盘");
-  console.log("  --force        目标已存在时直接覆盖");
+  console.log("  --force        兼容保留：默认行为已是「备份旧目录后覆盖更新」");
   console.log("  --uninstall    移除已安装技能");
 }
 

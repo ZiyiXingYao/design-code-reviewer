@@ -166,7 +166,7 @@ const out = {
   assertions: results,
   summary,
   numbering_gaps: realGaps,
-  note: "missing 必须人工归为 真缺失/改名未回写/表达差异；unverifiable 不进统计"
+  note: "本版本只产出 found/missing；unverifiable 预留给需要语义判断的断言（由人工填写），不参与机械统计。missing 必须人工归为 真缺失/改名未回写/表达差异"
 };
 
 if (outFile) writeFileSync(outFile, JSON.stringify(out, null, 2) + "\n");
