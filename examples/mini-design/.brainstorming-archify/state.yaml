@@ -1,0 +1,16 @@
+schema_version: 1
+state: "closed"
+files:
+  - path: "specs/design/00-接口契约.md"
+    status: "confirmed"
+  - path: "specs/design/01-架构设计.md"
+    status: "confirmed"
+  - path: "specs/design/02-实体与数据设计.md"
+    status: "confirmed"
+  - path: "specs/design/03-订单模块.md"
+    status: "confirmed"
+reopens: []
+change_list:
+  path: ".brainstorming-archify/change-lists/20260101T000000Z-init.md"
+  set_at: "2026-01-01T00:00:00Z"
+task_md: "specs/design/task.md"

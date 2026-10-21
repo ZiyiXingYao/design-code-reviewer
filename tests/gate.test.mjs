@@ -65,6 +65,17 @@ test("L0 报告出现「符合设计」：gate 拒绝", () => {
   assert.equal(r.out.results.find((x) => x.id.startsWith("G7")).ok, false);
 });
 
+test("L0 的 SUMMARY 出现「符合设计」：gate 拒绝", () => {
+  const dir = build(tmpReviewDir(), { bench: "L0" });
+  const sp = join(dir, "SUMMARY.md");
+  writeFileSync(sp, readFileSync(sp, "utf8").replace("有条件通过", "实现符合设计"));
+  const r = runGate(dir);
+  assert.equal(r.code, 1);
+  const g7 = r.out.results.find((x) => x.id.startsWith("G7"));
+  assert.equal(g7.ok, false);
+  assert.match(g7.detail, /SUMMARY/);
+});
+
 test("折中裁断：gate 拒绝", () => {
   const dir = build(tmpReviewDir(), { reason: "部分成立，有一定道理" });
   const r = runGate(dir);

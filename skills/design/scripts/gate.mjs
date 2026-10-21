@@ -136,6 +136,7 @@ const verdict = readJson(join(dir, "08-verdict.json"));
       const m = report.match(/基准[:：]\s*(L[012])/);
       if (!m) problems.push("REPORT.md 未见「基准: L0/L1/L2」");
       if (m && m[1] === "L0" && /符合设计/.test(report)) problems.push("L0 报告出现「符合设计」");
+      if (m && m[1] === "L0" && summary && /符合设计/.test(summary)) problems.push("L0 的 SUMMARY 出现「符合设计」");
     }
     if (!summary) problems.push("缺 SUMMARY.md");
     else if (!/L[012]/.test(summary.split("\n").slice(0, 8).join("\n"))) problems.push("SUMMARY.md 首段未标基准等级");
