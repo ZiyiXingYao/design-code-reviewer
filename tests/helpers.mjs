@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   initReview, commitBatch, updateState, appendProgress
-} from "../skills/design/scripts/lib/review-state.mjs";
+} from "../skills/design-review/scripts/lib/review-state.mjs";
 
 export function tmpReviewDir() {
   return mkdtempSync(join(tmpdir(), "dcr-"));

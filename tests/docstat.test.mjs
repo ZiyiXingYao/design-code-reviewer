@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const SCRIPT = new URL("../skills/design/scripts/docstat.mjs", import.meta.url).pathname;
+const SCRIPT = new URL("../skills/design-review/scripts/docstat.mjs", import.meta.url).pathname;
 
 function makeProject() {
   const dir = mkdtempSync(join(tmpdir(), "dcr-docstat-"));

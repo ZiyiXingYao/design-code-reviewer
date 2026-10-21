@@ -1,11 +1,11 @@
 ---
-name: impl
+name: impl-review
 description: 评审代码实现是否兑现了 brainstorming-archify 的设计，并做通用正确性/安全评审（20 镜头 + DR-1~8 漂移分类 + 五类对照）。有设计则对照，无设计降为 L0 仅代码评审但跑满 19 镜头。触发语：评审代码、实现符合设计吗、合并前检查、review 一下、这个 MR 有没有问题。
 ---
 
 # 实现评审（impl）
 
-对象是**代码**；设计文档是基准。**不评架构合理性**（那是 `design` 的事），除非违反设计明文约束。
+对象是**代码**；设计文档是基准。**不评架构合理性**（那是 `design-review` 的事），除非违反设计明文约束。
 
 `<skill-root>` = 本文件所在目录。
 
@@ -98,7 +98,7 @@ gate 不通过不许出报告（只能标 `DRAFT`）。
 
 ## 8 对抗
 
-与 `design` 同一套机制（`adversarial/orchestrator.md`）：扫描层按镜头组并行（7 组：S1 结构 / S2 状态 / S3 执行 / S4 边界 / S5 安全 / S6 工程 / S7 横切），对抗层 red→blue→judge 串行，只对 P0/P1。
+与 `design-review` 同一套机制（`adversarial/orchestrator.md`）：扫描层按镜头组并行（7 组：S1 结构 / S2 状态 / S3 执行 / S4 边界 / S5 安全 / S6 工程 / S7 横切），对抗层 red→blue→judge 串行，只对 P0/P1。
 红队弹药：20 镜头触发条件、信任边界表、恶意输入、并发交错序列、负向约束检查。
 所有 P0/P1 需在 `08-verdict.json` 有裁断；折中结论 → gate 拒绝。
 

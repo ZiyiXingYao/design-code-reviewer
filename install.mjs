@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 安装/更新/卸载 design 与 impl 两个技能到 CodeBuddy 技能目录。
+ * 安装/更新/卸载 design-review 与 impl-review 两个技能到 CodeBuddy 技能目录。
  *
  * 零依赖。成功不残留备份；中途失败保留备份供恢复。
  *
@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-const SKILLS = ["design", "impl"];
+const SKILLS = ["design-review", "impl-review"];
 
 function usage() {
   console.log(`用法: node install.mjs [--dry-run] [--force] [--dest <dir>] [--uninstall]`);

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { scaffold, tmpReviewDir, putBatch, heartbeat } from "./helpers.mjs";
-import { reconcile, loadState } from "../skills/design/scripts/lib/review-state.mjs";
+import { reconcile, loadState } from "../skills/design-review/scripts/lib/review-state.mjs";
 
 const payload = (id, extra = {}) => ({
   batch: id, group: "s1", unit: "维度D1", kind: "discrete", status: "done",

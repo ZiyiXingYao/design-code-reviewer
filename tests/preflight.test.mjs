@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const SCRIPT = new URL("../skills/impl/scripts/preflight.mjs", import.meta.url).pathname;
+const SCRIPT = new URL("../skills/impl-review/scripts/preflight.mjs", import.meta.url).pathname;
 
 function base() {
   const dir = mkdtempSync(join(tmpdir(), "dcr-pf-"));

@@ -19,7 +19,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   initReview, commitBatch, updateState, saveState, loadState
-} from "../skills/design/scripts/lib/review-state.mjs";
+} from "../skills/design-review/scripts/lib/review-state.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const node = process.execPath;
@@ -30,21 +30,21 @@ const project = join(tmp, "project");
 cpSync(join(ROOT, "examples", "mini-design"), project, { recursive: true });
 
 console.log("== 1. 设计产物基线 ==");
-const ds = run("skills/design/scripts/docstat.mjs", [project, "--json"]);
+const ds = run("skills/design-review/scripts/docstat.mjs", [project, "--json"]);
 if (ds.status !== 0) { console.error(ds.stderr); process.exit(1); }
 const docstat = JSON.parse(ds.stdout);
 console.log(`文档 ${docstat.file_count} 份 / ${docstat.total_lines} 行；问题 ${docstat.problems.length}；告警 ${docstat.warnings.length}`);
 
 console.log("\n== 2. 实现侧基准等级 ==");
-const pf = run("skills/impl/scripts/preflight.mjs", [project, "--json"]);
+const pf = run("skills/impl-review/scripts/preflight.mjs", [project, "--json"]);
 const pre = JSON.parse(pf.stdout);
 console.log(`基准 ${pre.bench}；设计 ${pre.design.files.length} 份；state=${pre.design.state}`);
 
 console.log("\n== 3. 断言与信号 ==");
-const cl = run("skills/impl/scripts/claims.mjs", [project, "--json"]);
+const cl = run("skills/impl-review/scripts/claims.mjs", [project, "--json"]);
 const claims = JSON.parse(cl.stdout);
 console.log(`断言 ${claims.assertions.length}；汇总 ${JSON.stringify(claims.summary)}`);
-const sm = run("skills/impl/scripts/smells.mjs", [project, "--json"]);
+const sm = run("skills/impl-review/scripts/smells.mjs", [project, "--json"]);
 const smells = JSON.parse(sm.stdout);
 console.log(`信号 ${smells.signals.length} 组`);
 
@@ -137,7 +137,7 @@ writeFileSync(join(review, "SUMMARY.md"), `# 示例结论
 `);
 
 console.log("\n== 5. 闸门 ==");
-const gate = run("skills/design/scripts/gate.mjs", [review]);
+const gate = run("skills/design-review/scripts/gate.mjs", [review]);
 console.log(gate.stdout.trim());
 console.log(`gate 退出码 ${gate.status}（0=通过）`);
 console.log(`\n临时目录：${tmp}`);

@@ -20,11 +20,11 @@ test("安装后可卸载，且成功安装不残留备份", () => {
   const dest = join(mkdtempSync(join(tmpdir(), "dcr-inst-")), "skills");
   const r1 = spawnSync(process.execPath, [INSTALL, "--dest", dest], { encoding: "utf8" });
   assert.equal(r1.status, 0, r1.stderr);
-  assert.ok(existsSync(join(dest, "design", "SKILL.md")));
-  assert.ok(existsSync(join(dest, "impl", "SKILL.md")));
+  assert.ok(existsSync(join(dest, "design-review", "SKILL.md")));
+  assert.ok(existsSync(join(dest, "impl-review", "SKILL.md")));
   assert.equal(readdirSync(dest).filter((n) => /\.(bak|new)-/.test(n)).length, 0);
 
   const r2 = spawnSync(process.execPath, [INSTALL, "--dest", dest, "--uninstall"], { encoding: "utf8" });
   assert.equal(r2.status, 0, r2.stderr);
-  assert.equal(existsSync(join(dest, "design")), false);
+  assert.equal(existsSync(join(dest, "design-review")), false);
 });

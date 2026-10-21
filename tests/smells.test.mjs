@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const SCRIPT = new URL("../skills/impl/scripts/smells.mjs", import.meta.url).pathname;
+const SCRIPT = new URL("../skills/impl-review/scripts/smells.mjs", import.meta.url).pathname;
 
 function project() {
   const dir = mkdtempSync(join(tmpdir(), "dcr-smells-"));

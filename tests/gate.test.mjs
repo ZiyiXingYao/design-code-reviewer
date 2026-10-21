@@ -4,9 +4,9 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { scaffold, tmpReviewDir, putBatch, writeVerdicts, writeReports } from "./helpers.mjs";
-import { loadState, saveState } from "../skills/design/scripts/lib/review-state.mjs";
+import { loadState, saveState } from "../skills/design-review/scripts/lib/review-state.mjs";
 
-const GATE = new URL("../skills/design/scripts/gate.mjs", import.meta.url).pathname;
+const GATE = new URL("../skills/design-review/scripts/gate.mjs", import.meta.url).pathname;
 
 function runGate(dir) {
   const r = spawnSync(process.execPath, [GATE, dir, "--json"], { encoding: "utf8" });

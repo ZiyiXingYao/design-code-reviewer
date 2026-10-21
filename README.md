@@ -6,8 +6,8 @@
 
 | 技能 | 标识符 | 审什么 | 不做什么 |
 |---|---|---|---|
-| 设计评审 | `design` | 设计方案是否合理、功能是否完整、产物是否合规 | 不读代码、不改文档 |
-| 实现评审 | `impl` | 代码是否兑现了设计 + 通用正确性/安全 | 不评架构合理性、不改代码 |
+| 设计评审 | `design-review` | 设计方案是否合理、功能是否完整、产物是否合规 | 不读代码、不改文档 |
+| 实现评审 | `impl-review` | 代码是否兑现了设计 + 通用正确性/安全 | 不评架构合理性、不改代码 |
 
 两者**完全独立、互不调用**。唯一交接物是设计评审报告末尾的「交接块」（设计基线、欠账白名单、设计约束 `C-n`）。
 
@@ -15,7 +15,7 @@
 
 ```bash
 node install.mjs --dry-run     # 看会装到哪
-node install.mjs               # 安装到 ~/.codebuddy/skills/{design,impl}
+node install.mjs               # 安装到 ~/.codebuddy/skills/{design-review,impl-review}
 node install.mjs --uninstall   # 卸载
 ```
 
@@ -96,7 +96,7 @@ L0 仍是完整评审（19 个镜头全跑），只是不做设计对照；但**
 ## 目录
 
 ```
-skills/design/
+skills/design-review/
 ├── SKILL.md               # 流程与铁律（≤300 行）
 ├── dimensions.md          # 15 维度
 ├── completeness.md        # 20 漏项
@@ -107,7 +107,7 @@ skills/design/
 ├── profiles/              # 语言/行业特化（只增不改）
 └── scripts/               # docstat / state / gate
 
-skills/impl/
+skills/impl-review/
 ├── SKILL.md
 ├── lenses/00..20          # 20 个镜头，按需加载
 ├── drift.md claims.md findings.md report.md
