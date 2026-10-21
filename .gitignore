@@ -1,0 +1,9 @@
+node_modules/
+
+# 本仓不含任何被审项目的内部资料
+评审技能设计方案.md
+evals/
+
+*.tmp
+*.log
+.DS_Store
