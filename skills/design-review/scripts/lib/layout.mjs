@@ -4,10 +4,11 @@
  *   工作目录  <root>/.design-code-reviewer/<YYYY-MM-DD>-<design|impl>[-N]/
  *   交付目录  <root>/specs/audit/<same-id>/
  *
- * 工作目录持有唯一权威的 state.yaml 与全部中间产物；交付目录只放 REPORT.md / SUMMARY.md。
+ * 工作目录持有唯一权威的 state.yaml 与全部中间产物；交付目录只放成品：
+ * reported 时交付 REPORT.md / SUMMARY.md 供人工评审，approve 后补入 task.md。
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { parseYaml } from "./yaml.mjs";
 
@@ -36,6 +37,22 @@ export function makeReviewId(root, type, d = new Date()) {
 export function workDir(root, id) {
   if (!isValidId(id)) throw new Error(`非法评审 id：${id}`);
   return join(resolve(root), WORK_ROOT, id);
+}
+
+/**
+ * 把成品从工作目录复制到交付目录（只复制存在且非空的文件）。
+ * 返回实际复制的文件名列表，供 state.report.files 记录。
+ */
+export function deliverArtifacts(reviewDir, outDir, files) {
+  mkdirSync(outDir, { recursive: true });
+  const copied = [];
+  for (const f of files) {
+    const src = join(resolve(reviewDir), f);
+    if (!existsSync(src) || statSync(src).size === 0) continue;
+    copyFileSync(src, join(outDir, f));
+    copied.push(f);
+  }
+  return copied;
 }
 
 export function auditDir(root, id) {

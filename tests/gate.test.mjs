@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { scaffold, tmpReviewDir, putBatch, writeVerdicts, writeReports } from "./helpers.mjs";
 import { loadState, saveState } from "../skills/design-review/scripts/lib/review-state.mjs";
@@ -119,4 +119,34 @@ test("stats 与裁断不符：gate 拒绝", () => {
   const r = runGate(dir);
   assert.equal(r.code, 1);
   assert.equal(r.out.results.find((x) => x.id.startsWith("G12")).ok, false);
+});
+
+test("reported 但成品未交付：G14 提示不通过（非阻断）", () => {
+  const dir = build(tmpReviewDir());
+  const r = runGate(dir);
+  assert.equal(r.code, 0, "reported 阶段不该阻断历史流程");
+  const g14 = r.out.results.find((x) => x.id.startsWith("G14"));
+  assert.equal(g14.ok, false);
+  assert.equal(g14.blocking, false);
+  assert.match(g14.detail, /state.report.dir/);
+});
+
+test("closed 但交付目录是旧稿：G14 拒绝", () => {
+  const dir = build(tmpReviewDir());
+  const out = join(dir, "specs", "audit", "2026-01-01-impl");
+  mkdirSync(out, { recursive: true });
+  writeFileSync(join(out, "REPORT.md"), "# 旧稿\n");
+  writeFileSync(join(out, "SUMMARY.md"), readFileSync(join(dir, "SUMMARY.md"), "utf8"));
+  writeFileSync(join(out, "task.md"), "# 任务\n");
+  const st = loadState(dir);
+  st.root = dir;
+  st.state = "closed";
+  st.report = { dir: "specs/audit/2026-01-01-impl", files: ["REPORT.md", "SUMMARY.md", "task.md"] };
+  saveState(dir, st);
+
+  const r = runGate(dir);
+  assert.equal(r.code, 1);
+  const g14 = r.out.results.find((x) => x.id.startsWith("G14"));
+  assert.equal(g14.ok, false);
+  assert.match(g14.detail, /REPORT.md 与工作目录不一致/);
 });

@@ -9,14 +9,15 @@
  *   state.mjs step <dir> --id A2 --status running|done|failed|skipped [--reason ...] [--done 7] [--total 15] [--output file]
  *   state.mjs agent <dir> --role scout-s1 --agent-id sub-a01 [--findings 4] [--retries 0] [--coverage-note "..."]
  *   state.mjs stats <dir> --accusations 27 --upheld 12 --dismissed 9 --unresolved 6 --valid-defense 8 --defended 18 [--escalated 0] [--first-round 27]
- *   state.mjs transition <dir> <scoped|scanning|verifying|reported|closed> --reason "..."
+ *   state.mjs transition <dir> <scoped|scanning|verifying|reported|closed> --reason "..."   # reported 自动交付 REPORT/SUMMARY
+ *   state.mjs deliver <dir> [--out <dir>]   # 报告修订后重新交付，供人工评审
  *   state.mjs interruption <dir> --batch b12 --reason "..." --action "..."
  *   state.mjs show <dir>
  */
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { auditDir, makeReviewId, rel, workDir } from "./lib/layout.mjs";
+import { auditDir, deliverArtifacts, makeReviewId, rel, workDir } from "./lib/layout.mjs";
 import { atomicWrite } from "./lib/review-state.mjs";
 import { generateTaskMd } from "./lib/task-plan.mjs";
 import { syncForReview } from "./lib/ledger.mjs";
@@ -26,6 +27,9 @@ import {
 } from "./lib/review-state.mjs";
 
 function fail(msg) { console.error(`state: ${msg}`); process.exit(1); }
+
+/** reported 阶段就要交付给人工评审的成品；task.md 批准后才生成 */
+const DELIVERED_AT_REPORTED = ["REPORT.md", "SUMMARY.md"];
 
 function parse(argv) {
   const out = { _: [] };
@@ -179,8 +183,43 @@ switch (cmd) {
     const to = args._[1];
     if (!to) fail("缺少目标状态");
     if (!["scoped", "scanning", "verifying", "reported", "closed"].includes(to)) fail(`非法状态 ${to}`);
-    const s = updateState(dir, (st) => addLog(st, to, args.reason || ""));
-    console.log(`状态 -> ${s.state}`);
+    const before = loadState(dir);
+    const root = before.root ? resolve(before.root) : resolve(".");
+    let delivered = null;
+    if (to === "reported") {
+      // 人工评审的对象是交付目录里的成品，进 reported 前必须先落盘
+      for (const f of DELIVERED_AT_REPORTED) {
+        const fp = join(dir, f);
+        if (!existsSync(fp) || statSync(fp).size === 0) fail(`进入 reported 前必须写好 ${f}`);
+      }
+      const out = auditDir(root, before.review_id || basename(dir));
+      const files = deliverArtifacts(dir, out, DELIVERED_AT_REPORTED);
+      delivered = { dir: rel(root, out), files, at: new Date().toISOString() };
+    }
+    const s = updateState(dir, (st) => {
+      addLog(st, to, args.reason || "");
+      if (delivered) st.report = { dir: delivered.dir, files: delivered.files, delivered_at: delivered.at };
+    });
+    console.log(delivered
+      ? `状态 -> ${s.state}；已交付 ${delivered.files.join(" / ")} 到 ${delivered.dir}`
+      : `状态 -> ${s.state}`);
+    break;
+  }
+  case "deliver": {
+    // 人工评审提出疑问后报告可能被修订，重新交付保证交付目录与工作副本一致
+    const st = loadState(dir);
+    if (st.state === "closed") fail("评审已 closed，交付物已定稿，拒绝覆盖");
+    for (const f of DELIVERED_AT_REPORTED) {
+      const fp = join(dir, f);
+      if (!existsSync(fp) || statSync(fp).size === 0) fail(`缺少或为空：${f}`);
+    }
+    const root = st.root ? resolve(st.root) : resolve(".");
+    const out = args.out ? resolve(args.out) : auditDir(root, st.review_id || basename(dir));
+    const files = deliverArtifacts(dir, out, DELIVERED_AT_REPORTED);
+    updateState(dir, (s) => {
+      s.report = { ...(s.report || {}), dir: rel(root, out), files, delivered_at: new Date().toISOString() };
+    });
+    console.log(`已交付 ${files.join(" / ")} 到 ${rel(root, out)}`);
     break;
   }
   case "interruption": {
@@ -250,10 +289,11 @@ switch (cmd) {
 
     const root = st.root ? resolve(st.root) : resolve(".");
     const ledgerRes = syncForReview(root, dir);
+    // 复核交付：评审期间报告可能被修订，批准时三件一起重写，避免交付目录留下旧稿
     const out = args.out ? resolve(args.out) : auditDir(root, st.review_id || basename(dir));
-    mkdirSync(out, { recursive: true });
-    const files = ["REPORT.md", "SUMMARY.md", "task.md"];
-    for (const f of files) copyFileSync(join(dir, f), join(out, f));
+    const files = [...DELIVERED_AT_REPORTED, "task.md"];
+    const copied = deliverArtifacts(dir, out, files);
+    if (copied.length !== files.length) fail(`交付不完整，缺：${files.filter((f) => !copied.includes(f)).join("、")}`);
 
     // 可读裁断表（工作产物，不进入交付三件套）
     const verdictJson = readJson("08-verdict.json");
@@ -262,11 +302,11 @@ switch (cmd) {
     atomicWrite(join(dir, "08-verdict.md"), lines.join("\n") + "\n");
 
     updateState(dir, (s) => {
-      s.report = { dir: rel(root, out), files };
+      s.report = { dir: rel(root, out), files: copied, delivered_at: new Date().toISOString() };
       s.approval = { reviewer: args.reviewer, at: new Date().toISOString(), note: args.note || "" };
       addLog(s, "closed", `人工批准（${args.reviewer}），生成 task.md 并交付`);
     });
-    console.log(JSON.stringify({ ok: true, audit: out, files, tasks: gen.tasks.length, ledger: { created: ledgerRes.created, updated: ledgerRes.updated, total: ledgerRes.total }, task_md: join(out, "task.md") }, null, 2));
+    console.log(JSON.stringify({ ok: true, audit: out, files: copied, tasks: gen.tasks.length, ledger: { created: ledgerRes.created, updated: ledgerRes.updated, total: ledgerRes.total }, task_md: join(out, "task.md") }, null, 2));
     break;
   }
 

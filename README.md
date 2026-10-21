@@ -177,14 +177,15 @@ gate 相关检查：G5 所有 P0/P1 有裁断且无折中；G11 红/蓝/裁齐�
 └── gate-result.md
 
 <project>/specs/audit/<YYYY-MM-DD>-<design|impl>/             # 交付目录
-├── REPORT.md            # 11 节，含全部证据
-├── SUMMARY.md           # ≤2 页，含"最该关心的三件事"
+├── REPORT.md            # 11 节，含全部证据（进入 reported 即就位）
+├── SUMMARY.md           # ≤2 页，含"最该关心的三件事"（进入 reported 即就位）
 └── task.md              # 人工批准后生成的修复任务清单
 ```
 
 - 权威顺序：**批产物 > 日志 > state**；崩溃后 `resume` 自动对账并丢弃"有日志无产物"的批。
 - `gate.mjs` 在出报告前校验覆盖度、对抗完整性、基准标注、可追溯性；不通过只能出 `DRAFT`，也不许 `promote`。
-- 报告产出后停在 `reported`，**等人工评审**；`state.mjs approve <reviewDir> --reviewer "<姓名>"` 才生成 `task.md`、复制三份成品并置 `closed`。此后工作目录只读。
+- 报告产出后停在 `reported`，**同时把 REPORT/SUMMARY 交付到 `specs/audit/<id>/`**，人工评审的对象就是这两个成品；报告被修订后用 `state.mjs deliver <reviewDir>` 重新交付。
+- `state.mjs approve <reviewDir> --reviewer "<姓名>"` 才生成 `task.md`、按工作副本复核三份成品并置 `closed`。此后工作目录只读。
 - 中断恢复：`node <skill>/scripts/resume.mjs <project> --list`；无参数时唯一未完成直接恢复、多个要求 `--id` 选择。
 
 

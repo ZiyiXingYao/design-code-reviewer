@@ -110,7 +110,7 @@ function implPlan() {
 function initDesign(root, id) {
   const dir = workDir(root, id);
   initReview(dir, { type: "design", reviewId: id, root, expected: designPlan().expected, steps: ["A0"], batches: designPlan().batches });
-  updateState(dir, (s) => { s.state = "reported"; s.steps.A0 = { status: "done", at: new Date().toISOString() }; });
+  updateState(dir, (s) => { s.state = "verifying"; s.steps.A0 = { status: "done", at: new Date().toISOString() }; });
   seedAgents(dir);
   commitBatch(dir, { payload: { batch: "b01", group: "s1", unit: "15 维度", kind: "discrete", status: "done", covers: Array.from({ length: 15 }, (_, i) => ({ kind: "dimension", id: `D${i + 1}` })), findings: [], coverage_note: "ok", cross_hints: [] } });
   commitBatch(dir, { payload: { batch: "b02", group: "a4", unit: "17 场景", kind: "discrete", status: "done", covers: ["F1","F2","F3","F4","F5","C1","C2","C3","C4","V1","V2","V3","V4","O1","O2","S1","S2"].map((id) => ({ kind: "scenario", id })), findings: [], coverage_note: "ok", cross_hints: [] } });
@@ -118,19 +118,24 @@ function initDesign(root, id) {
   seedFindings(dir, { type: "design", level: "P1" });
   writeFileSync(join(dir, "REPORT.md"), "# 设计评审报告\nGate D 结论：不通过\n\n发现 F-001。\n对抗：成立率 1.00 / 有效辩护率 0.00 / 升级率 0.00 / 未决率 0.00\n\n## 交接块\n- C-1 主实体可跨分区 → 状态键按分区聚合\n");
   writeFileSync(join(dir, "SUMMARY.md"), summaryMd("不通过"));
+  // 进 reported 即交付成品，人工评审看到的就是交付目录里的文件
+  const t = run("skills/design-review/scripts/state.mjs", ["transition", dir, "reported", "--reason", "A7 完成"]);
+  if (t.status !== 0) throw new Error("transition reported 失败：" + t.stderr);
   return dir;
 }
 
 function initImpl(root, id) {
   const dir = workDir(root, id);
   initReview(dir, { type: "impl", reviewId: id, root, expected: implPlan().expected, steps: ["B0"], batches: implPlan().batches });
-  updateState(dir, (s) => { s.state = "reported"; s.steps.B0 = { status: "done", at: new Date().toISOString() }; });
+  updateState(dir, (s) => { s.state = "verifying"; s.steps.B0 = { status: "done", at: new Date().toISOString() }; });
   seedAgents(dir);
   commitBatch(dir, { payload: { batch: "b01", group: "s3", unit: "20 镜头", kind: "discrete", status: "done", covers: Array.from({ length: 20 }, (_, i) => ({ kind: "lens", id: String(i + 1) })), findings: [], coverage_note: "ok", cross_hints: [] } });
   seedFindings(dir, { type: "impl", level: "P1" });
   J(join(dir, "preflight.json"), { failures: [] });
   writeFileSync(join(dir, "REPORT.md"), "# 实现评审报告\n基准：L1\nGate I 结论：有条件通过\n\n发现 F-001。\n对抗：成立率 1.00 / 有效辩护率 0.00 / 升级率 0.00 / 未决率 0.00\n");
   writeFileSync(join(dir, "SUMMARY.md"), summaryMd("有条件通过", "L1"));
+  const t = run("skills/impl-review/scripts/state.mjs", ["transition", dir, "reported", "--reason", "B9 完成"]);
+  if (t.status !== 0) throw new Error("transition reported 失败：" + t.stderr);
   return dir;
 }
 
@@ -160,6 +165,26 @@ ok("design: gate 通过", () => {
   const j = JSON.parse(g.stdout);
   eq(g.status, 0, "gate 失败：" + j.results.filter((x) => !x.ok && x.blocking).map((x) => `${x.id}[${x.detail}]`).join(" | "));
 });
+ok("design: reported 即交付 2 件，task.md 尚未生成", () => {
+  const root = designDir.split("/.design-code-reviewer/")[0];
+  const audit = auditDir(root, "2026-01-01-design");
+  for (const f of ["REPORT.md", "SUMMARY.md"]) {
+    truthy(existsSync(join(audit, f)), `交付缺 ${f}`);
+    eq(readFileSync(join(audit, f), "utf8"), readFileSync(join(designDir, f), "utf8"), `${f} 与工作副本不一致`);
+  }
+  truthy(!existsSync(join(audit, "task.md")), "批准前不该有 task.md");
+});
+
+ok("design: 报告修订后 deliver 重新交付", () => {
+  const root = designDir.split("/.design-code-reviewer/")[0];
+  const audit = auditDir(root, "2026-01-01-design");
+  const before = readFileSync(join(designDir, "REPORT.md"), "utf8");
+  writeFileSync(join(designDir, "REPORT.md"), before + "\n<!-- 答复人工提问后的修订 -->\n");
+  const r = run("skills/design-review/scripts/state.mjs", ["deliver", designDir]);
+  eq(r.status, 0, r.stderr);
+  eq(readFileSync(join(audit, "REPORT.md"), "utf8"), readFileSync(join(designDir, "REPORT.md"), "utf8"), "交付未刷新");
+});
+
 ok("design: approve 生成 task.md / 08-verdict.md / ledger", () => {
   const r = run("skills/design-review/scripts/state.mjs", ["approve", designDir, "--reviewer", "dry-run"]);
   eq(r.status, 0, r.stderr);
@@ -184,6 +209,12 @@ ok("impl: gate 通过（含 G15–G19）", () => {
   const g = run("skills/impl-review/scripts/gate.mjs", [implDir, "--json"]);
   const j = JSON.parse(g.stdout);
   eq(g.status, 0, "gate 失败：" + j.results.filter((x) => !x.ok && x.blocking).map((x) => `${x.id}[${x.detail}]`).join(" | "));
+});
+ok("impl: reported 即交付 2 件，task.md 尚未生成", () => {
+  const root = implDir.split("/.design-code-reviewer/")[0];
+  const audit = auditDir(root, "2026-01-01-impl");
+  for (const f of ["REPORT.md", "SUMMARY.md"]) truthy(existsSync(join(audit, f)), `交付缺 ${f}`);
+  truthy(!existsSync(join(audit, "task.md")), "批准前不该有 task.md");
 });
 ok("impl: approve 交付 3 件", () => {
   const r = run("skills/impl-review/scripts/state.mjs", ["approve", implDir, "--reviewer", "dry-run"]);

@@ -9,7 +9,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { loadPlan, loadState, listBatchFiles, loadBatches, computeCoverage } from "./lib/review-state.mjs";
 import { checkFloor } from "./lib/plan-floor.mjs";
 
@@ -295,27 +295,29 @@ const verdict = readJson(join(dir, "08-verdict.json"));
   check("G12 对抗指标", problems.length === 0, problems.join("；") || "四指标由 stats 计算并已披露");
 }
 
-// G14 交付物（closed 时）
+// G14 交付物（reported 起就交付 2 件成品供人工评审；closed 要求 3 件齐全且与工作副本一致）
 {
-  if (state.state !== "closed") {
-    check("G14 交付物", true, "未 closed，跳过", false);
+  const st = state.state;
+  if (st !== "reported" && st !== "closed") {
+    check("G14 交付物", true, "未到 reported，跳过", false);
   } else {
     const rep = state.report || {};
     const root = state.root ? state.root : ".";
+    const rootDir = resolve(root);
     const files = rep.files || [];
+    const want = st === "closed" ? ["REPORT.md", "SUMMARY.md", "task.md"] : ["REPORT.md", "SUMMARY.md"];
     const problems = [];
-    if (!rep.dir) problems.push("state.report.dir 为空");
-    if (!files.length) problems.push("state.report.files 为空");
-    for (const f of files) {
-      const p = join(root, rep.dir || "", f);
+    if (!rep.dir) problems.push("state.report.dir 为空，报告未交付");
+    for (const f of want) {
+      if (!files.includes(f)) problems.push(`state.report.files 缺 ${f}`);
+      const p = join(rootDir, rep.dir || "", f);
       if (!existsSync(p)) problems.push(`缺交付文件：${p}`);
-    }
-    if (existsSync(join(dir, "REPORT.md")) && files.includes("REPORT.md") && existsSync(join(root, rep.dir, "REPORT.md"))) {
-      if (readFileSync(join(dir, "REPORT.md"), "utf8") !== readFileSync(join(root, rep.dir, "REPORT.md"), "utf8")) {
-        problems.push("交付目录的 REPORT.md 与工作目录不一致");
+      else if (existsSync(join(dir, f)) && readFileSync(join(dir, f), "utf8") !== readFileSync(p, "utf8")) {
+        problems.push(`交付目录的 ${f} 与工作目录不一致，需重新 deliver`);
       }
     }
-    check("G14 交付物", problems.length === 0, problems.join("；") || `${files.length} 份报告已交付`);
+    // reported 阶段只是提醒（历史流程可能在 reported 后补交付）；closed 必须一致
+    check("G14 交付物", problems.length === 0, problems.join("；") || `${want.length} 份成品已交付（${rep.dir}）`, st === "closed");
   }
 }
 

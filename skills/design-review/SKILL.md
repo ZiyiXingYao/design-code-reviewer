@@ -55,8 +55,8 @@ node <skill-root>/scripts/docstat.mjs <projectRoot> [--json]
 | **A5b 蓝队** | 逐条辩护或承认 | `07-defense.json` | 每条有结论；无效辩护视为承认 |
 | **A5c 裁判** | 三态裁断，禁止折中 | `08-verdict.json` | 只有 upheld/dismissed/unresolved |
 | **A6 定级成文** | 按裁断定级 → `REPORT.md`（11 节 + 交接块） | 报告 | gate 通过 |
-| **A7 收口** | `SUMMARY.md` + gate | 2 页说明书 | gate 通过 |
-| **A8 人工批准 + task.md** | 把报告交人评审；批准后生成修复任务清单并交付 | `task.md` + 交付目录 3 文件 | `approve` 成功，状态 `closed` |
+| **A7 收口 + 交付** | `SUMMARY.md` + gate，再把 REPORT/SUMMARY 交付到 `specs/audit/<id>/` | 2 页说明书 + 交付目录 2 件 | gate 通过；交付目录 2 件与工作副本一致 |
+| **A8 人工评审 + task.md** | 把**已交付的成品**交人评审；批准后生成修复任务清单并关闭 | `task.md` | `approve` 成功，状态 `closed` |
 
 **风险加权**：reopen ≥3 的文档逐节细查；1–2 次抽查；0 次只看维度。
 
@@ -93,10 +93,11 @@ node <skill-root>/scripts/state.mjs partial <reviewDir> --batch b08 --payload <p
 node <skill-root>/scripts/state.mjs step <reviewDir> --id A2 --status running --done 7 --total 15
 node <skill-root>/scripts/state.mjs agent <reviewDir> --role scout-s1 --agent-id sub-a01 --findings 4 --coverage-note "…"
 node <skill-root>/scripts/state.mjs stats <reviewDir> --accusations 27 --upheld 12 --dismissed 9 --unresolved 6 --valid-defense 8
-node <skill-root>/scripts/state.mjs transition <reviewDir> reported --reason "A6 完成"
+node <skill-root>/scripts/state.mjs transition <reviewDir> reported --reason "A6 完成"   # 自动交付 REPORT/SUMMARY 到 specs/audit/<id>/
 
-# 闸门与交付（gate 通过后，人工批准才生成 task.md 并 closed）
+# 闸门与交付（reported 即可评审；报告修订后 deliver 刷新；批准后才生成 task.md 并 closed）
 node <skill-root>/scripts/gate.mjs <reviewDir>
+node <skill-root>/scripts/state.mjs deliver <reviewDir>        # 答复评审意见、报告修订后重新交付
 node <skill-root>/scripts/state.mjs approve <reviewDir> --reviewer "<姓名>" [--note "…"] [--include-p2]
 node <skill-root>/scripts/ledger.mjs <projectRoot> sync <reviewDir>     # approve 会自动执行
 node <skill-root>/scripts/ledger.mjs <projectRoot> list --status open
@@ -110,9 +111,12 @@ node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 - 批写入是 `tmp → fsync → rename`；不要手写 `batches/`，一律走 `state.mjs batch`。
 - 中断后：`resume` 会清理 `*.tmp`、丢弃"有日志无产物"的批、重算覆盖并输出下一批。
 - **gate 不通过不许出报告，也不许 approve**；此时报告只能标 `DRAFT`。
-- `approve` 才生成 `task.md` 并把 REPORT/SUMMARY/task.md 交付；同时自动更新跨次账本 `ledger.yaml`，之后 `state=closed`。
+- **交付早于批准**：进入 `reported` 时自动把 REPORT/SUMMARY 复制到 `specs/audit/<id>/`，人工评审的对象就是这些成品；只存在于工作目录的报告不算交付。
+- 报告在评审中被修订后必须 `deliver` 重新交付；交付目录与工作副本不一致时 gate G14 拦截。
+- `approve` 才生成 `task.md`，三件一起复核交付（覆盖旧稿）并置 `closed`；同时自动更新跨次账本 `ledger.yaml`。
 - gate 的覆盖下限：design 标准档 15 维/17 卡/20 格（格数须为 20 的倍数）；确需更小范围用 `plan.coverage_floor_exempt` 或 `gate --allow-partial-coverage`。
 - **人工评审是独立一步**：报告写完停 `reported`，等待用户确认；批准人必须显式传给 `--reviewer`。
+- **请人评审时必须报清交付状态**：给出交付目录路径、已落地文件清单，并说明 `task.md` 待批准后生成。不许只说"报告写好了"——评审者会打开 `specs/audit/<id>/`，那里必须有东西。
 
 ## 6 目录
 
@@ -125,17 +129,17 @@ node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 ├── 00-baseline.md … 05-findings.md
 ├── 06-accusations.json / 07-defense.json / 08-verdict.json
 ├── gate-result.md
-├── REPORT.md            # 工作副本
-├── SUMMARY.md           # 工作副本
+├── REPORT.md            # 工作副本（reported 时已复制到交付目录）
+├── SUMMARY.md           # 工作副本（reported 时已复制到交付目录）
 └── task.md              # 批准后生成（工作副本）
 
 <projectRoot>/specs/audit/<YYYY-MM-DD>-design/            # 交付目录（只放成品）
-├── REPORT.md            # 11 节 + 交接块
-├── SUMMARY.md           # ≤2 页
+├── REPORT.md            # 11 节 + 交接块（进入 reported 即就位）
+├── SUMMARY.md           # ≤2 页（进入 reported 即就位）
 └── task.md              # 修复任务清单（人工批准后生成）
 ```
 
-报告是聚合物：每节都能追溯到批产物；不要自由发挥。交付目录只有两个文件，证据仍在工作目录，报告用路径引用。
+报告是聚合物：每节都能追溯到批产物；不要自由发挥。交付目录在 `reported` 时只有 REPORT/SUMMARY 两件，`task.md` 批准后才补入；证据仍在工作目录，报告用路径引用。
 
 ## 7 判据索引
 

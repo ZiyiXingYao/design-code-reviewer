@@ -21,7 +21,7 @@ description: 评审代码实现是否兑现了 brainstorming-archify 的设计�
 - **B7 不评架构** — 不评模块划分与技术选型。
 - **B8 对抗** — 所有 P0/P1 必须过红-蓝-裁，三轮上下文隔离；"上游应该校验了"= 无效辩护。
 
-## 2 流程 B0–B9
+## 2 流程 B0–B10
 
 | 步 | 动作 | 产出 | 退出条件 |
 |---|---|---|---|
@@ -37,8 +37,8 @@ description: 评审代码实现是否兑现了 brainstorming-archify 的设计�
 | **B6.5 去重合并** | 同位置同机制合并；同机制跨位置归并 | 唯一发现集 | 必须在对抗之前 |
 | **B7a/b/c 红-蓝-裁** | 子代理执行 | 06/07/08.json | 无折中结论 |
 | **B8 定级成文** | 11 节报告 | `REPORT.md` | gate 通过 |
-| **B9 收口** | `SUMMARY.md` + gate | 2 页说明书 | gate 通过 |
-| **B10 人工批准 + task.md** | 报告交人评审；批准后生成修复任务清单并交付 | `task.md` + 交付目录 3 文件 | `approve` 成功，状态 `closed` |
+| **B9 收口 + 交付** | `SUMMARY.md` + gate，再把 REPORT/SUMMARY 交付到 `specs/audit/<id>/` | 2 页说明书 + 交付目录 2 件 | gate 通过；交付目录 2 件与工作副本一致 |
+| **B10 人工评审 + task.md** | 把**已交付的成品**交人评审；批准后生成修复任务清单并关闭 | `task.md` | `approve` 成功，状态 `closed` |
 
 ## 3 基准等级
 
@@ -97,6 +97,8 @@ node <skill-root>/scripts/smells.mjs <projectRoot> --json --out <reviewDir>/smel
 node <skill-root>/scripts/state.mjs batch <reviewDir> --payload <b01.json> --agent sub-a01
 node <skill-root>/scripts/state.mjs partial <reviewDir> --batch b08 --payload <part.json>
 node <skill-root>/scripts/gate.mjs <reviewDir>
+node <skill-root>/scripts/state.mjs transition <reviewDir> reported --reason "B9 完成"   # 自动交付 REPORT/SUMMARY 到 specs/audit/<id>/
+node <skill-root>/scripts/state.mjs deliver <reviewDir>        # 报告修订后重新交付，供人工评审
 node <skill-root>/scripts/state.mjs approve <reviewDir> --reviewer "<姓名>" [--note "…"] [--include-p2]
 node <skill-root>/scripts/ledger.mjs <projectRoot> sync <reviewDir>     # approve 会自动执行
 
@@ -106,11 +108,12 @@ node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 ```
 
 权威顺序：`batches/*.json` > `progress.log` > `state.yaml`。批写入走 `tmp→fsync→rename`。
-gate 不通过不许出报告（只能标 `DRAFT`），也不许 approve。approve 后 `closed`，工作目录只读。
+gate 不通过不许出报告（只能标 `DRAFT`），也不许 approve。进入 `reported` 即自动交付 REPORT/SUMMARY，人工评审的对象是交付目录里的成品；批准后 `closed`，工作目录只读。
+请人评审时必须报出交付目录路径、已落地文件清单，并说明 `task.md` 待批准后生成。
 
 覆盖下限：impl 标准档 20 镜头（quick 5）；低于下限时 gate 拒绝，除非显式豁免。跨次账本在 `.design-code-reviewer/ledger.yaml`。
 
-中间产物在 `.design-code-reviewer/<YYYY-MM-DD>-impl/`；成品把 `REPORT.md`、`SUMMARY.md`、`task.md` 放到 `specs/audit/<YYYY-MM-DD>-impl/`。`task.md` 由人工批准后按 P0/P1 生成，依赖排序、四段式提示词。
+中间产物在 `.design-code-reviewer/<YYYY-MM-DD>-impl/`；成品放 `specs/audit/<YYYY-MM-DD>-impl/`：`reported` 时先就位 `REPORT.md`、`SUMMARY.md`，`task.md` 由人工批准后按 P0/P1 生成，依赖排序、四段式提示词。
 
 ## 7.5 子代理前置
 

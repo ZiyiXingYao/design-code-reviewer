@@ -84,21 +84,21 @@ console.log(`批完成 ${st.recovery.done}；覆盖 ${JSON.stringify(st.coverage
 
 // 让 gate 看到完整的对抗记录（本样例不派子代理，仅验证闸门规则）
 updateState(review, (s) => {
-  s.state = "reported";
+  s.state = "verifying";
   s.steps.A4_5 = { status: "done", at: "2026-01-01T00:00:00Z" };
   s.steps.A5a = { status: "done", at: "2026-01-01T00:01:00Z" };
   s.adversarial.agents = [
-    ...["s1","s2","s3","s4","s5","s6","s7"].map((g) => ({ role: `scout-${g}`, agent_id: `sub-${g}`, coverage_note: "示例" })),
+    ...["s1","s2","s3","s4","s5","s6","s7"].map((g) => ({ role: `scout-${g}`, agent_id: `sub-${g}`, coverage_note: "示例", cross_hints: [] })),
     { role: "red", agent_id: "sub-red", coverage_note: "示例", retries: 0 },
     { role: "blue", agent_id: "sub-blue", retries: 0 },
     { role: "judge", agent_id: "sub-judge", retries: 0 }
   ];
-  s.adversarial.stats = { accusations: 1, upheld: 1, dismissed: 0, unresolved: 0, valid_defense: 0, escalated: 0 };
+  s.adversarial.stats = { accusations: 1, upheld: 1, dismissed: 0, unresolved: 0, valid_defense: 0, defended: 1, escalated: 0, first_round: 1 };
   s.batches[0].status = "done";
 });
 writeFileSync(join(review, "06-accusations.json"), JSON.stringify({ accusations: [{ id: "A-001", source_findings: ["F-001"], location: "03-订单模块.md:20", mechanism: "m", consequence: "c" }] }, null, 2));
 writeFileSync(join(review, "07-defense.json"), JSON.stringify({ defenses: [{ accusation_id: "A-001", claim: "admit", location: "-", mechanism: "-" }] }, null, 2));
-writeFileSync(join(review, "08-verdict.json"), JSON.stringify({ verdicts: [{ accusation_id: "A-001", decision: "upheld", level: "P1", reason: "机制成立" }], stats: { accusations: 1, upheld: 1, dismissed: 0, unresolved: 0, valid_defense: 0 } }, null, 2));
+writeFileSync(join(review, "08-verdict.json"), JSON.stringify({ verdicts: [{ accusation_id: "A-001", decision: "upheld", level: "P1", reason: "机制成立" }], stats: { accusations: 1, upheld: 1, dismissed: 0, unresolved: 0, valid_defense: 0, defended: 1, first_round: 1 } }, null, 2));
 writeFileSync(join(review, "05-findings.json"), JSON.stringify({ findings: [{ id: "F-001", level: "P1", title: "示例", location: "03-订单模块.md:20", mechanism: "m", counterexample: "c", sources: [{ batch: "b01", id: "F-001", level: "P1" }] }] }, null, 2));
 writeFileSync(join(review, "REPORT.md"), `# 示例评审报告
 
@@ -147,7 +147,13 @@ console.log(gate.stdout.trim());
 console.log(`gate 退出码 ${gate.status}（0=通过）`);
 if (gate.status !== 0) process.exit(1);
 
-console.log("\n== 6. 交付 ==");
+console.log("\n== 6. 交付（reported 即交付成品供人工评审）==");
+const reported = run("skills/design-review/scripts/state.mjs", ["transition", review, "reported", "--reason", "示例 A7 完成"]);
+if (reported.status !== 0) { console.error(reported.stderr); process.exit(1); }
+console.log(reported.stdout.trim());
+for (const f of ["REPORT.md", "SUMMARY.md"]) {
+  console.log(`交付目录已有 ${f}：${existsSync(join(auditDir(project, reviewId), f)) ? "是" : "否"}`);
+}
 console.log("人工批准（示例）：reviewer=示例评审员");
 const approved = run("skills/design-review/scripts/state.mjs", ["approve", review, "--reviewer", "示例评审员"]);
 if (approved.status !== 0) { console.error(approved.stderr); process.exit(1); }
