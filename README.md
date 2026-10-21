@@ -1,5 +1,7 @@
 # design-code-reviewer
 
+**当前版本：0.2.1**
+
 > 让"评审"从一次性对话变成可复现、可审计的流程：固定判据、批级落盘、红蓝裁对抗、出报告前强制闸门。
 
 两个 CodeBuddy 技能，用来评审「先出设计文档、再出实现」的项目：
@@ -100,11 +102,6 @@ L0 仍是完整评审（19 个镜头全跑），只是不做设计对照；但**
 - `state.mjs promote` 才复制报告到 `specs/audit/` 并置 `closed`；此后工作目录只读。
 - 中断恢复：`node <skill>/scripts/resume.mjs <project> --list`；无参数时唯一未完成直接恢复、多个要求 `--id` 选择。
 
-## 版本
-
-- 0.2.1：新增斜杠命令 `/review-resume`（安装器同时安装到 `~/.codebuddy/commands/`）。
-- 0.2.0：评审产物分层（工作目录 / 交付目录）、`resume` 命令、`promote` 交付；**破坏性变更**——0.1 的 `specs/audit/<date>/state.yaml` 不再作为工作状态，旧报告只作历史。
-- 0.1.0：首个可用版本——design-review（15 维度 / 20 漏项 / 17 场景卡 / 7 组扫描 / 红蓝裁对抗）与 impl-review（20 镜头 / DR-1~8 / 五类对照 / L0-L2 基准）；批级原子落盘、出报告前 gate 闸门、`install.mjs` 与 24 条自测；状态与报告统一放在 `specs/audit/<date>-<type>/`。
 
 ## 评价指标（怎么知道它有效）
 
