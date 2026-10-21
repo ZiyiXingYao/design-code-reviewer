@@ -104,6 +104,7 @@ L0 仍是完整评审（19 个镜头全跑），只是不做设计对照；但**
 
 - 0.2.1：新增斜杠命令 `/review-resume`（安装器同时安装到 `~/.codebuddy/commands/`）。
 - 0.2.0：评审产物分层（工作目录 / 交付目录）、`resume` 命令、`promote` 交付；**破坏性变更**——0.1 的 `specs/audit/<date>/state.yaml` 不再作为工作状态，旧报告只作历史。
+- 0.1.0：首个可用版本——design-review（15 维度 / 20 漏项 / 17 场景卡 / 7 组扫描 / 红蓝裁对抗）与 impl-review（20 镜头 / DR-1~8 / 五类对照 / L0-L2 基准）；批级原子落盘、出报告前 gate 闸门、`install.mjs` 与 24 条自测；状态与报告统一放在 `specs/audit/<date>-<type>/`。
 
 ## 评价指标（怎么知道它有效）
 
