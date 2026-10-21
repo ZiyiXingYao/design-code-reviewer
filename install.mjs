@@ -9,13 +9,14 @@
  *   node install.mjs --uninstall [--dry-run] [--dest <dir>]
  */
 
-import { existsSync, mkdirSync, cpSync, renameSync, rmSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, cpSync, copyFileSync, renameSync, rmSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const SKILLS = ["design-review", "impl-review"];
+const COMMANDS = ["review-resume.md"];
 
 function usage() {
   console.log(`用法: node install.mjs [--dry-run] [--force] [--dest <dir>] [--uninstall]`);
@@ -101,6 +102,19 @@ const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+$/, "Z"
 for (const name of SKILLS) {
   if (opts.uninstall) uninstallOne(name, opts);
   else installOne(name, opts, stamp);
+}
+
+// 斜杠命令装到 <dest>/../commands
+const cmdDir = join(dirname(opts.dest), "commands");
+for (const name of COMMANDS) {
+  const src = join(ROOT, "commands", name);
+  const dest = join(cmdDir, name);
+  if (!existsSync(src)) fail(`缺命令源文件：${src}`);
+  console.log(`${opts.dryRun ? "[dry-run] " : ""}${opts.uninstall ? "卸载" : "安装"}命令 ${name}: ${dest}`);
+  if (opts.dryRun) continue;
+  if (opts.uninstall) { rmSync(dest, { force: true }); continue; }
+  mkdirSync(cmdDir, { recursive: true });
+  copyFileSync(src, dest);
 }
 
 if (!opts.dryRun) {

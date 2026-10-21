@@ -21,6 +21,16 @@ node install.mjs --uninstall   # 卸载
 
 零依赖，需要 Node ≥ 20。
 
+## 斜杠命令
+
+| 命令 | 作用 |
+|---|---|
+| `/review-resume` | 恢复中断的评审：扫描 `.design-code-reviewer/*-{design,impl}/`，唯一未完成直接续跑，多个则要求选择 |
+| `/design-review` | 直接开一轮设计评审（技能自身可被斜杠调用） |
+| `/impl-review` | 直接开一轮实现评审 |
+
+`/review-resume` 只负责"接着跑"：沿用原 `plan.json` 与档位，只补 `next_batches` / `pending_steps`，不会重跑已完成批。
+
 ## 触发
 
 - 设计评审：「评审设计方案」「这个架构合理吗」「模块划分有没有问题」「这份设计能不能开工」
@@ -92,6 +102,7 @@ L0 仍是完整评审（19 个镜头全跑），只是不做设计对照；但**
 
 ## 版本
 
+- 0.2.1：新增斜杠命令 `/review-resume`（安装器同时安装到 `~/.codebuddy/commands/`）。
 - 0.2.0：评审产物分层（工作目录 / 交付目录）、`resume` 命令、`promote` 交付；**破坏性变更**——0.1 的 `specs/audit/<date>/state.yaml` 不再作为工作状态，旧报告只作历史。
 
 ## 评价指标（怎么知道它有效）
