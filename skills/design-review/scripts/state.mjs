@@ -17,6 +17,8 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { auditDir, makeReviewId, rel, workDir } from "./lib/layout.mjs";
+import { atomicWrite } from "./lib/review-state.mjs";
+import { generateTaskMd } from "./lib/task-plan.mjs";
 import {
   addLog, commitBatch, initReview, loadState, reconcile, saveState, updateState,
   appendProgress, computeCoverage, loadPlan, loadBatches
@@ -169,26 +171,67 @@ switch (cmd) {
     break;
   }
   case "promote": {
+    fail("promote 已由 approve 取代：node state.mjs approve <reviewDir> --reviewer \"<name>\"");
+    break;
+  }
+
+  case "approve": {
+    if (typeof args.reviewer !== "string" || !args.reviewer.trim()) fail("缺少 --reviewer（人工批准人）");
     const st = loadState(dir);
-    if (st.state === "closed") fail("评审已 closed，无需重复 promote");
+    if (st.state === "closed") fail("评审已 closed，无需重复 approve");
+    if (st.state !== "reported") fail(`当前状态 ${st.state}，需先完成报告并进入 reported`);
+
     const gateFile = join(dir, "gate-result.md");
     if (!existsSync(gateFile)) fail("缺 gate-result.md，请先运行 gate.mjs");
-    const gateText = readFileSync(gateFile, "utf8");
-    if (!/结论：通过/.test(gateText)) fail("gate 未通过，拒绝 promote");
-    const reports = ["REPORT.md", "SUMMARY.md"];
-    for (const f of reports) {
+    if (!/结论：通过/.test(readFileSync(gateFile, "utf8"))) fail("gate 未通过，拒绝批准");
+
+    for (const f of ["REPORT.md", "SUMMARY.md"]) {
       const fp = join(dir, f);
       if (!existsSync(fp) || statSync(fp).size === 0) fail(`缺少或为空：${f}`);
     }
+
+    const readJson = (name) => {
+      const fp = join(dir, name);
+      if (!existsSync(fp)) fail(`缺少 ${name}`);
+      return JSON.parse(readFileSync(fp, "utf8"));
+    };
+    const findings = readJson("05-findings.json").findings || [];
+    const verdict = readJson("08-verdict.json");
+    const accusations = readJson("06-accusations.json").accusations || [];
+    const taskPath = join(dir, "task.md");
+    const existing = existsSync(taskPath) ? readFileSync(taskPath, "utf8") : "";
+
+    const p0 = verdict.verdicts.filter((v) => v.decision === "upheld" && v.level === "P0").length;
+    const p1 = verdict.verdicts.filter((v) => v.decision === "upheld" && v.level === "P1").length;
+    const conclusion = args.conclusion || (p0 > 0 ? "不通过" : p1 > 0 ? "有条件通过" : "通过");
+
+    const gen = generateTaskMd({
+      reviewId: st.review_id || basename(dir),
+      reviewType: st.review_type,
+      reviewer: args.reviewer,
+      at: new Date().toISOString(),
+      conclusion,
+      findings,
+      verdicts: verdict.verdicts || [],
+      accusations,
+      includeP2: args["include-p2"] === true,
+      existing
+    });
+    if (!gen.ok) fail(`任务生成失败：${gen.errors.join("；")}`);
+    atomicWrite(taskPath, gen.markdown);
+
     const root = st.root ? resolve(st.root) : resolve(".");
     const out = args.out ? resolve(args.out) : auditDir(root, st.review_id || basename(dir));
     mkdirSync(out, { recursive: true });
-    for (const f of reports) copyFileSync(join(dir, f), join(out, f));
+    const files = ["REPORT.md", "SUMMARY.md", "task.md"];
+    for (const f of files) copyFileSync(join(dir, f), join(out, f));
+
     updateState(dir, (s) => {
-      s.report = { dir: rel(root, out), files: reports };
-      addLog(s, "closed", "promote 完成，报告已交付");
+      s.report = { dir: rel(root, out), files };
+      s.approval = { reviewer: args.reviewer, at: new Date().toISOString(), note: args.note || "" };
+      addLog(s, "closed", `人工批准（${args.reviewer}），生成 task.md 并交付`);
     });
-    console.log(JSON.stringify({ ok: true, audit: out, files: reports }, null, 2));
+    console.log(JSON.stringify({ ok: true, audit: out, files, tasks: gen.tasks.length, task_md: join(out, "task.md") }, null, 2));
     break;
   }
 

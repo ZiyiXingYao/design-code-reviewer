@@ -55,7 +55,8 @@ node <skill-root>/scripts/docstat.mjs <projectRoot> [--json]
 | **A5b 蓝队** | 逐条辩护或承认 | `07-defense.json` | 每条有结论；无效辩护视为承认 |
 | **A5c 裁判** | 三态裁断，禁止折中 | `08-verdict.json` | 只有 upheld/dismissed/unresolved |
 | **A6 定级成文** | 按裁断定级 → `REPORT.md`（11 节 + 交接块） | 报告 | gate 通过 |
-| **A7 收口** | `SUMMARY.md` + gate + 冻结 | 2 页说明书 | 收口六项全过 |
+| **A7 收口** | `SUMMARY.md` + gate | 2 页说明书 | gate 通过 |
+| **A8 人工批准 + task.md** | 把报告交人评审；批准后生成修复任务清单并交付 | `task.md` + 交付目录 3 文件 | `approve` 成功，状态 `closed` |
 
 **风险加权**：reopen ≥3 的文档逐节细查；1–2 次抽查；0 次只看维度。
 
@@ -93,9 +94,9 @@ node <skill-root>/scripts/state.mjs agent <reviewDir> --role scout-s1 --agent-id
 node <skill-root>/scripts/state.mjs stats <reviewDir> --accusations 27 --upheld 12 --dismissed 9 --unresolved 6 --valid-defense 8
 node <skill-root>/scripts/state.mjs transition <reviewDir> reported --reason "A6 完成"
 
-# 闸门与交付（gate 通过后 promote 才复制报告并 closed）
+# 闸门与交付（gate 通过后，人工批准才生成 task.md 并 closed）
 node <skill-root>/scripts/gate.mjs <reviewDir>
-node <skill-root>/scripts/state.mjs promote <reviewDir>
+node <skill-root>/scripts/state.mjs approve <reviewDir> --reviewer "<姓名>" [--note "…"] [--include-p2]
 
 # 中断恢复（扫描 .design-code-reviewer/*-design/state.yaml，按 mtime 倒序）
 node <skill-root>/scripts/resume.mjs <projectRoot> --list
@@ -105,8 +106,9 @@ node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 - **权威顺序**：`batches/*.json` > `progress.log` > `state.yaml`。state 只是汇总缓存，损坏可重建。
 - 批写入是 `tmp → fsync → rename`；不要手写 `batches/`，一律走 `state.mjs batch`。
 - 中断后：`resume` 会清理 `*.tmp`、丢弃"有日志无产物"的批、重算覆盖并输出下一批。
-- **gate 不通过不许出报告，也不许 promote**；此时报告只能标 `DRAFT`。
-- `promote` 之后 `state=closed`，该目录拒绝再写入；要改结论请开新一轮。
+- **gate 不通过不许出报告，也不许 approve**；此时报告只能标 `DRAFT`。
+- `approve` 才生成 `task.md` 并把 REPORT/SUMMARY/task.md 交付；之后 `state=closed`，该目录拒绝再写入。
+- **人工评审是独立一步**：报告写完停 `reported`，等待用户确认；批准人必须显式传给 `--reviewer`。
 
 ## 6 目录
 
@@ -120,11 +122,13 @@ node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 ├── 06-accusations.json / 07-defense.json / 08-verdict.json
 ├── gate-result.md
 ├── REPORT.md            # 工作副本
-└── SUMMARY.md           # 工作副本
+├── SUMMARY.md           # 工作副本
+└── task.md              # 批准后生成（工作副本）
 
 <projectRoot>/specs/audit/<YYYY-MM-DD>-design/            # 交付目录（只放成品）
 ├── REPORT.md            # 11 节 + 交接块
-└── SUMMARY.md           # ≤2 页
+├── SUMMARY.md           # ≤2 页
+└── task.md              # 修复任务清单（人工批准后生成）
 ```
 
 报告是聚合物：每节都能追溯到批产物；不要自由发挥。交付目录只有两个文件，证据仍在工作目录，报告用路径引用。

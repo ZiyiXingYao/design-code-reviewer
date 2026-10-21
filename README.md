@@ -1,6 +1,6 @@
 # design-code-reviewer
 
-**当前版本：0.2.1**
+**当前版本：0.3.0**
 
 > 让"评审"从一次性对话变成可复现、可审计的流程：固定判据、批级落盘、红蓝裁对抗、出报告前强制闸门。
 
@@ -94,12 +94,13 @@ L0 仍是完整评审（19 个镜头全跑），只是不做设计对照；但**
 
 <project>/specs/audit/<YYYY-MM-DD>-<design|impl>/             # 交付目录
 ├── REPORT.md            # 11 节，含全部证据
-└── SUMMARY.md           # ≤2 页，含"最该关心的三件事"
+├── SUMMARY.md           # ≤2 页，含"最该关心的三件事"
+└── task.md              # 人工批准后生成的修复任务清单
 ```
 
 - 权威顺序：**批产物 > 日志 > state**；崩溃后 `resume` 自动对账并丢弃"有日志无产物"的批。
 - `gate.mjs` 在出报告前校验覆盖度、对抗完整性、基准标注、可追溯性；不通过只能出 `DRAFT`，也不许 `promote`。
-- `state.mjs promote` 才复制报告到 `specs/audit/` 并置 `closed`；此后工作目录只读。
+- 报告产出后停在 `reported`，**等人工评审**；`state.mjs approve <reviewDir> --reviewer "<姓名>"` 才生成 `task.md`、复制三份成品并置 `closed`。此后工作目录只读。
 - 中断恢复：`node <skill>/scripts/resume.mjs <project> --list`；无参数时唯一未完成直接恢复、多个要求 `--id` 选择。
 
 

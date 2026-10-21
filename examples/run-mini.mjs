@@ -146,9 +146,12 @@ console.log(`gate 退出码 ${gate.status}（0=通过）`);
 if (gate.status !== 0) process.exit(1);
 
 console.log("\n== 6. 交付 ==");
-const promoted = run("skills/design-review/scripts/state.mjs", ["promote", review]);
-if (promoted.status !== 0) { console.error(promoted.stderr); process.exit(1); }
-console.log(promoted.stdout.trim());
+console.log("人工批准（示例）：reviewer=示例评审员");
+const approved = run("skills/design-review/scripts/state.mjs", ["approve", review, "--reviewer", "示例评审员"]);
+if (approved.status !== 0) { console.error(approved.stderr); process.exit(1); }
+console.log(approved.stdout.trim());
+const tmd = join(auditDir(project, reviewId), "task.md");
+console.log(`task.md：${tmd}（${existsSync(tmd) ? "已生成" : "缺失"}）`);
 
 console.log(`\n工作目录：${review}`);
 console.log(`交付目录：${auditDir(project, reviewId)}`);

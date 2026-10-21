@@ -13,6 +13,16 @@ const STATE = new URL("../skills/design-review/scripts/state.mjs", import.meta.u
 
 function root() { return mkdtempSync(join(tmpdir(), "dcr-resume-")); }
 
+function writeJson(path, obj) { writeFileSync(path, JSON.stringify(obj, null, 2)); }
+
+function finding(id, level) {
+  return {
+    id, level, title: "示例缺陷", location: "07-设备模块.md:100",
+    mechanism: "缺少校验", counterexample: "给定非法输入 → 越界 → 因为没有校验",
+    sources: [{ batch: "b01", id, level }]
+  };
+}
+
 function makeReview(r, id, { closed = false, batches = 2 } = {}) {
   const dir = workDir(r, id);
   const plan = {
@@ -76,21 +86,26 @@ test("已 closed：拒绝恢复", () => {
   assert.match(out.stderr, /closed/);
 });
 
-test("promote：gate 未通过拒绝，通过后复制并 closed", () => {
+test("approve：gate 未通过拒绝，通过后复制 3 件并 closed", () => {
   const r = root();
   const dir = makeReview(r, "2026-01-01-design");
   writeFileSync(join(dir, "REPORT.md"), "# report\n");
   writeFileSync(join(dir, "SUMMARY.md"), "# summary\n");
+  updateState(dir, (s) => { s.state = "reported"; });
 
-  let out = run(STATE, ["promote", dir]);
+  let out = run(STATE, ["approve", dir, "--reviewer", "测试"]);
   assert.equal(out.status, 1);
   assert.match(out.stderr, /gate/);
 
   writeFileSync(join(dir, "gate-result.md"), "# gate 校验结果\n\n- 结论：通过\n");
-  out = run(STATE, ["promote", dir]);
+  writeJson(join(dir, "05-findings.json"), { findings: [finding("F-001", "P0")] });
+  writeJson(join(dir, "06-accusations.json"), { accusations: [{ id: "A-001", source_findings: ["F-001"], location: "x", mechanism: "m", consequence: "c" }] });
+  writeJson(join(dir, "08-verdict.json"), { verdicts: [{ accusation_id: "A-001", decision: "upheld", level: "P0", reason: "r" }], stats: { accusations: 1, upheld: 1, dismissed: 0, unresolved: 0, valid_defense: 0 } });
+  out = run(STATE, ["approve", dir, "--reviewer", "测试"]);
   assert.equal(out.status, 0, out.stderr);
-  assert.ok(existsSync(join(auditDir(r, "2026-01-01-design"), "REPORT.md")));
-  assert.ok(existsSync(join(auditDir(r, "2026-01-01-design"), "SUMMARY.md")));
+  for (const f of ["REPORT.md", "SUMMARY.md", "task.md"]) {
+    assert.ok(existsSync(join(auditDir(r, "2026-01-01-design"), f)), f);
+  }
 });
 
 test("closed 后拒绝写批与步骤", () => {
@@ -99,7 +114,11 @@ test("closed 后拒绝写批与步骤", () => {
   writeFileSync(join(dir, "REPORT.md"), "# report\n");
   writeFileSync(join(dir, "SUMMARY.md"), "# summary\n");
   writeFileSync(join(dir, "gate-result.md"), "- 结论：通过\n");
-  assert.equal(run(STATE, ["promote", dir]).status, 0);
+  updateState(dir, (s) => { s.state = "reported"; });
+  writeJson(join(dir, "05-findings.json"), { findings: [finding("F-001", "P0")] });
+  writeJson(join(dir, "06-accusations.json"), { accusations: [{ id: "A-001", source_findings: ["F-001"], location: "x", mechanism: "m", consequence: "c" }] });
+  writeJson(join(dir, "08-verdict.json"), { verdicts: [{ accusation_id: "A-001", decision: "upheld", level: "P0", reason: "r" }], stats: { accusations: 1, upheld: 1, dismissed: 0, unresolved: 0, valid_defense: 0 } });
+  assert.equal(run(STATE, ["approve", dir, "--reviewer", "测试"]).status, 0);
 
   const step = run(STATE, ["step", dir, "--id", "A0", "--status", "running"]);
   assert.notEqual(step.status, 0);
@@ -133,4 +152,27 @@ test("plan.json 被改动：拒绝恢复，--force 可覆盖", () => {
   assert.equal(out.status, 4);
   const forced = run(RESUME, [r, "--id", "2026-01-01-design", "--force", "--json"]);
   assert.equal(forced.status, 0, forced.stderr);
+});
+
+test("approve 缺 reviewer / 非 reported：拒绝", () => {
+  const r = root();
+  const dir = makeReview(r, "2026-01-01-design");
+  writeFileSync(join(dir, "gate-result.md"), "- 结论：通过\n");
+  writeFileSync(join(dir, "REPORT.md"), "# r\n");
+  writeFileSync(join(dir, "SUMMARY.md"), "# s\n");
+
+  const noRev = run(STATE, ["approve", dir]);
+  assert.equal(noRev.status, 1);
+  assert.match(noRev.stderr, /reviewer/);
+
+  updateState(dir, (s) => { s.state = "reported"; });
+  writeJson(join(dir, "05-findings.json"), { findings: [finding("F-001", "P0")] });
+  writeJson(join(dir, "06-accusations.json"), { accusations: [{ id: "A-001", source_findings: ["F-001"], location: "x", mechanism: "m", consequence: "c" }] });
+  writeJson(join(dir, "08-verdict.json"), { verdicts: [{ accusation_id: "A-001", decision: "upheld", level: "P0", reason: "r" }], stats: { accusations: 1, upheld: 1, dismissed: 0, unresolved: 0, valid_defense: 0 } });
+  const ok = run(STATE, ["approve", dir, "--reviewer", "测试"]);
+  assert.equal(ok.status, 0, ok.stderr);
+
+  const again = run(STATE, ["approve", dir, "--reviewer", "测试"]);
+  assert.equal(again.status, 1);
+  assert.match(again.stderr, /closed/);
 });

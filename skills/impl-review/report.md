@@ -88,6 +88,10 @@
 
 L0 是完整评审，不是打折评审：19 个镜头一条不少，只是少了"是否按这份设计做的"这一项判断；镜头 0 在 L0 下跳过并标注（不许用代码反推需求）。
 
+## 批准与 task.md
+
+报告产出后状态停在 `reported`。批准后 `state.mjs approve <reviewDir> --reviewer "<姓名>"` 生成 `task.md`（P0/P1 修复任务、依赖排序、四段式 AI 提示词）并 `closed`。
+
 ## Gate I 通过条件
 
 - 无 P0；

@@ -36,7 +36,8 @@ description: 评审代码实现是否兑现了 brainstorming-archify 的设计�
 | **B6.5 去重合并** | 同位置同机制合并；同机制跨位置归并 | 唯一发现集 | 必须在对抗之前 |
 | **B7a/b/c 红-蓝-裁** | 子代理执行 | 06/07/08.json | 无折中结论 |
 | **B8 定级成文** | 11 节报告 | `REPORT.md` | gate 通过 |
-| **B9 收口** | `SUMMARY.md` + 冻结 | 2 页说明书 | 收口六项全过 |
+| **B9 收口** | `SUMMARY.md` + gate | 2 页说明书 | gate 通过 |
+| **B10 人工批准 + task.md** | 报告交人评审；批准后生成修复任务清单并交付 | `task.md` + 交付目录 3 文件 | `approve` 成功，状态 `closed` |
 
 ## 3 基准等级
 
@@ -92,7 +93,7 @@ node <skill-root>/scripts/claims.mjs <projectRoot> --out <reviewDir>/claims.json
 node <skill-root>/scripts/smells.mjs <projectRoot> --json --out <reviewDir>/smells.json
 node <skill-root>/scripts/state.mjs batch <reviewDir> --payload <b01.json> --agent sub-a01
 node <skill-root>/scripts/gate.mjs <reviewDir>
-node <skill-root>/scripts/state.mjs promote <reviewDir>
+node <skill-root>/scripts/state.mjs approve <reviewDir> --reviewer "<姓名>" [--note "…"] [--include-p2]
 
 # 中断恢复
 node <skill-root>/scripts/resume.mjs <projectRoot> --list
@@ -100,9 +101,9 @@ node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 ```
 
 权威顺序：`batches/*.json` > `progress.log` > `state.yaml`。批写入走 `tmp→fsync→rename`。
-gate 不通过不许出报告（只能标 `DRAFT`），也不许 promote。promote 后 `closed`，工作目录只读。
+gate 不通过不许出报告（只能标 `DRAFT`），也不许 approve。approve 后 `closed`，工作目录只读。
 
-中间产物在 `.design-code-reviewer/<YYYY-MM-DD>-impl/`；成品只把 `REPORT.md`、`SUMMARY.md` 放到 `specs/audit/<YYYY-MM-DD>-impl/`。
+中间产物在 `.design-code-reviewer/<YYYY-MM-DD>-impl/`；成品把 `REPORT.md`、`SUMMARY.md`、`task.md` 放到 `specs/audit/<YYYY-MM-DD>-impl/`。`task.md` 由人工批准后按 P0/P1 生成，依赖排序、四段式提示词。
 
 ## 8 对抗
 
