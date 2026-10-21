@@ -19,6 +19,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { auditDir, makeReviewId, rel, workDir } from "./lib/layout.mjs";
 import { atomicWrite } from "./lib/review-state.mjs";
 import { generateTaskMd } from "./lib/task-plan.mjs";
+import { syncForReview } from "./lib/ledger.mjs";
 import {
   addLog, commitBatch, initReview, loadState, reconcile, saveState, updateState,
   appendProgress, computeCoverage, loadPlan, loadBatches
@@ -64,6 +65,7 @@ switch (cmd) {
       expected: spec.expected || {},
       steps: spec.steps || [],
       batches: spec.batches || [],
+      planExtra: spec.coverage_floor_exempt ? { coverage_floor_exempt: true } : {},
       commit: args.commit || "",
       designState: args["design-state"] || "",
       reopen: args.reopen ? Number(args.reopen) : 0,
@@ -85,6 +87,17 @@ switch (cmd) {
     console.log(`已落盘 ${payload.batch}；完成 ${s.done.length}/${s.done.length + s.pending.length}`);
     break;
   }
+  case "partial": {
+    if (!args.batch || !args.payload) fail("缺少 --batch / --payload");
+    if (loadState(dir).state === "closed") fail("评审已 closed，拒绝写入");
+    const payload = JSON.parse(readFileSync(resolve(args.payload), "utf8"));
+    const filled = payload.filled_cells || [];
+    const out = { batch: args.batch, group: payload.group || "", unit: payload.unit || "", filled_cells: filled, cells: payload.cells || [], updated_at: new Date().toISOString() };
+    atomicWrite(join(dir, "batches", `${args.batch}.partial.json`), JSON.stringify(out, null, 2) + "\n");
+    console.log(`已记录 partial ${args.batch}：${filled.length} 格（下一格 #${filled.length + 1}）`);
+    break;
+  }
+
   case "heartbeat": {
     if (!args.id) fail("缺少 --id");
     appendProgress(dir, { batch: args.id, status: "running", beat: Number(args.beat || 1), ts: new Date().toISOString() });
@@ -221,6 +234,7 @@ switch (cmd) {
     atomicWrite(taskPath, gen.markdown);
 
     const root = st.root ? resolve(st.root) : resolve(".");
+    const ledgerRes = syncForReview(root, dir);
     const out = args.out ? resolve(args.out) : auditDir(root, st.review_id || basename(dir));
     mkdirSync(out, { recursive: true });
     const files = ["REPORT.md", "SUMMARY.md", "task.md"];
@@ -231,7 +245,7 @@ switch (cmd) {
       s.approval = { reviewer: args.reviewer, at: new Date().toISOString(), note: args.note || "" };
       addLog(s, "closed", `人工批准（${args.reviewer}），生成 task.md 并交付`);
     });
-    console.log(JSON.stringify({ ok: true, audit: out, files, tasks: gen.tasks.length, task_md: join(out, "task.md") }, null, 2));
+    console.log(JSON.stringify({ ok: true, audit: out, files, tasks: gen.tasks.length, ledger: { created: ledgerRes.created, updated: ledgerRes.updated, total: ledgerRes.total }, task_md: join(out, "task.md") }, null, 2));
     break;
   }
 

@@ -92,8 +92,10 @@ node <skill-root>/scripts/preflight.mjs <projectRoot> [--require-design] --out <
 node <skill-root>/scripts/claims.mjs <projectRoot> --out <reviewDir>/claims.json
 node <skill-root>/scripts/smells.mjs <projectRoot> --json --out <reviewDir>/smells.json
 node <skill-root>/scripts/state.mjs batch <reviewDir> --payload <b01.json> --agent sub-a01
+node <skill-root>/scripts/state.mjs partial <reviewDir> --batch b08 --payload <part.json>
 node <skill-root>/scripts/gate.mjs <reviewDir>
 node <skill-root>/scripts/state.mjs approve <reviewDir> --reviewer "<姓名>" [--note "…"] [--include-p2]
+node <skill-root>/scripts/ledger.mjs <projectRoot> sync <reviewDir>     # approve 会自动执行
 
 # 中断恢复
 node <skill-root>/scripts/resume.mjs <projectRoot> --list
@@ -102,6 +104,8 @@ node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 
 权威顺序：`batches/*.json` > `progress.log` > `state.yaml`。批写入走 `tmp→fsync→rename`。
 gate 不通过不许出报告（只能标 `DRAFT`），也不许 approve。approve 后 `closed`，工作目录只读。
+
+覆盖下限：impl 标准档 20 镜头（quick 5）；低于下限时 gate 拒绝，除非显式豁免。跨次账本在 `.design-code-reviewer/ledger.yaml`。
 
 中间产物在 `.design-code-reviewer/<YYYY-MM-DD>-impl/`；成品把 `REPORT.md`、`SUMMARY.md`、`task.md` 放到 `specs/audit/<YYYY-MM-DD>-impl/`。`task.md` 由人工批准后按 P0/P1 生成，依赖排序、四段式提示词。
 

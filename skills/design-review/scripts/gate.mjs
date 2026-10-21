@@ -11,10 +11,12 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadPlan, loadState, listBatchFiles, loadBatches, computeCoverage } from "./lib/review-state.mjs";
+import { checkFloor } from "./lib/plan-floor.mjs";
 
 const dir = process.argv[2];
 if (!dir) { console.error("用法: node gate.mjs <reviewDir> [--json]"); process.exit(2); }
 const asJson = process.argv.includes("--json");
+const allowPartialCoverage = process.argv.includes("--allow-partial-coverage");
 
 const results = [];
 function check(id, ok, detail, blocking = true) {
@@ -157,6 +159,36 @@ const verdict = readJson(join(dir, "08-verdict.json"));
     if (!ids.length) problems.push("报告未引用任何发现编号");
   }
   check("G8 报告可追溯", problems.length === 0, problems.join("；") || "报告中发现编号均可回溯到批产物");
+}
+
+// G16 覆盖下限
+{
+  const floor = checkFloor(plan);
+  const exempt = allowPartialCoverage || plan.coverage_floor_exempt === true;
+  check("G16 覆盖下限", floor.ok || exempt,
+    (floor.problems.join("；") || "满足下限") + (exempt && !floor.ok ? "（已显式豁免）" : ""),
+    !exempt);
+}
+
+// G17 批量/子代理上限
+{
+  const problems = [];
+  for (const b of batches) {
+    if ((b.findings || []).length > 15) problems.push(`${b.batch} findings ${b.findings.length} > 15`);
+    if ((b.cells || []).length > 25) problems.push(`${b.batch} cells ${b.cells.length} > 25`);
+  }
+  const agents = state.adversarial?.agents || [];
+  if (agents.length > 14) problems.push(`子代理 ${agents.length} > 14`);
+  check("G17 批量上限", problems.length === 0, problems.join("；") || "未超限");
+}
+
+// G15 账本（closed 时）
+{
+  if (state.state !== "closed") check("G15 账本", true, "未 closed，跳过", false);
+  else {
+    const ok = state.ledger?.synced === true;
+    check("G15 账本", ok, ok ? `已同步（新增 ${state.ledger.new} / 仍存在 ${state.ledger.still}）` : "closed 但未同步账本");
+  }
 }
 
 // G13 顺序：去重必须先于对抗

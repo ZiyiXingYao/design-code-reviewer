@@ -89,6 +89,7 @@ node <skill-root>/scripts/state.mjs init <projectRoot> --type design --plan <pla
 # 落盘与进度
 node <skill-root>/scripts/state.mjs batch <reviewDir> --payload <b01.json> --agent sub-a01 --ms 142000
 node <skill-root>/scripts/state.mjs heartbeat <reviewDir> --id b07 --beat 3
+node <skill-root>/scripts/state.mjs partial <reviewDir> --batch b08 --payload <part.json>
 node <skill-root>/scripts/state.mjs step <reviewDir> --id A2 --status running --done 7 --total 15
 node <skill-root>/scripts/state.mjs agent <reviewDir> --role scout-s1 --agent-id sub-a01 --findings 4 --coverage-note "…"
 node <skill-root>/scripts/state.mjs stats <reviewDir> --accusations 27 --upheld 12 --dismissed 9 --unresolved 6 --valid-defense 8
@@ -97,6 +98,8 @@ node <skill-root>/scripts/state.mjs transition <reviewDir> reported --reason "A6
 # 闸门与交付（gate 通过后，人工批准才生成 task.md 并 closed）
 node <skill-root>/scripts/gate.mjs <reviewDir>
 node <skill-root>/scripts/state.mjs approve <reviewDir> --reviewer "<姓名>" [--note "…"] [--include-p2]
+node <skill-root>/scripts/ledger.mjs <projectRoot> sync <reviewDir>     # approve 会自动执行
+node <skill-root>/scripts/ledger.mjs <projectRoot> list --status open
 
 # 中断恢复（扫描 .design-code-reviewer/*-design/state.yaml，按 mtime 倒序）
 node <skill-root>/scripts/resume.mjs <projectRoot> --list
@@ -107,7 +110,8 @@ node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 - 批写入是 `tmp → fsync → rename`；不要手写 `batches/`，一律走 `state.mjs batch`。
 - 中断后：`resume` 会清理 `*.tmp`、丢弃"有日志无产物"的批、重算覆盖并输出下一批。
 - **gate 不通过不许出报告，也不许 approve**；此时报告只能标 `DRAFT`。
-- `approve` 才生成 `task.md` 并把 REPORT/SUMMARY/task.md 交付；之后 `state=closed`，该目录拒绝再写入。
+- `approve` 才生成 `task.md` 并把 REPORT/SUMMARY/task.md 交付；同时自动更新跨次账本 `ledger.yaml`，之后 `state=closed`。
+- gate 的覆盖下限：design 标准档 15 维/17 卡/20 格（格数须为 20 的倍数）；确需更小范围用 `plan.coverage_floor_exempt` 或 `gate --allow-partial-coverage`。
 - **人工评审是独立一步**：报告写完停 `reported`，等待用户确认；批准人必须显式传给 `--reviewer`。
 
 ## 6 目录

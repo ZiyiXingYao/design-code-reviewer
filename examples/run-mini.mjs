@@ -54,6 +54,7 @@ const reviewId = makeReviewId(project, "design");
 const review = workDir(project, reviewId);
 const plan = {
   expected: { dimension: 1 },
+  coverage_floor_exempt: true,
   steps: ["A0"],
   batches: [{ id: "b01", group: "s1", unit: "D1 示例", kind: "discrete" }]
 };
@@ -61,7 +62,8 @@ writeFileSync(join(tmp, "plan.json"), JSON.stringify(plan, null, 2));
 initReview(review, {
   type: "design", reviewId, root: project, tier: "standard",
   expected: plan.expected, steps: plan.steps,
-  batches: plan.batches, commit: "example", designState: "closed", reopen: 0
+  batches: plan.batches, planExtra: { coverage_floor_exempt: true },
+  commit: "example", designState: "closed", reopen: 0
 });
 updateState(review, (st) => { st.steps.A0 = { status: "done", at: new Date().toISOString() }; });
 commitBatch(review, {

@@ -153,6 +153,8 @@ export function commitBatch(dir, { payload, agent = "", ms = 0 }) {
 
   const target = join(dir, "batches", `${payload.batch}.json`);
   atomicWriteJson(target, payload);
+  const partialFile = join(dir, "batches", `${payload.batch}.partial.json`);
+  if (existsSync(partialFile)) rmSync(partialFile, { force: true });
 
   appendProgress(dir, {
     batch: payload.batch, group: payload.group, status: payload.status,
@@ -185,8 +187,15 @@ export function reconcile(dir) {
       // 解析失败视同无产物
     }
   }
+  const partialDetails = [];
   for (const name of files) {
-    if (name.endsWith(".partial.json")) partial.push(name);
+    if (!name.endsWith(".partial.json")) continue;
+    partial.push(name);
+    try {
+      const j = JSON.parse(readFileSync(join(dir, "batches", name), "utf8"));
+      const filled = j.filled_cells || [];
+      partialDetails.push({ batch: j.batch || name.replace(".partial.json", ""), filled: filled.length, next_cell: `#${filled.length + 1}` });
+    } catch { /* 损坏的 partial 只列出文件名 */ }
   }
 
   // 任何日志痕迹（含心跳 running）都算"该批启动过"；产物缺失即判丢弃重跑
@@ -219,7 +228,7 @@ export function reconcile(dir) {
 
   const coverage = computeCoverage(plan, [...present.values()]);
   const state = buildState(dir, plan, {
-    done, pending, discarded, skipped, coverage, partial,
+    done, pending, discarded, skipped, coverage, partial, partialDetails,
     progressMissing: done.filter((id) => !loggedDone.has(id))
   });
   return state;
@@ -284,12 +293,13 @@ function buildState(dir, plan, extra) {
       discarded: extra.discarded.length,
       skipped: extra.skipped.length,
       partial: extra.partial,
+      partial_batches: extra.partialDetails || [],
       progress_missing: extra.progressMissing
     },
     batches,
     log: prev.log || []
   };
-  return { state, done: extra.done, pending: extra.pending, discarded: extra.discarded, skipped: extra.skipped, coverage: extra.coverage };
+  return { state, done: extra.done, pending: extra.pending, discarded: extra.discarded, skipped: extra.skipped, coverage: extra.coverage, partial: extra.partialDetails || [] };
 }
 
 export function initReview(dir, opts) {
@@ -301,7 +311,8 @@ export function initReview(dir, opts) {
     created_at: new Date().toISOString(),
     expected: opts.expected || {},
     steps: opts.steps || [],
-    batches: opts.batches || []
+    batches: opts.batches || [],
+    ...(opts.planExtra || {})
   };
   if (!plan.batches.length) throw new Error("plan 必须至少包含一个批次");
   for (const b of plan.batches) {

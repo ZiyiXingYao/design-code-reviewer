@@ -105,6 +105,7 @@ const payload = {
   dir: target.dir,
   state: st.state,
   recovery: { done: result.done, pending: result.pending, discarded: result.discarded, skipped: result.skipped },
+  partial_batches: result.partial || [],
   next_batches: nextBatches,
   pending_steps: pendingSteps,
   interruptions: st.interruptions || [],
@@ -119,6 +120,9 @@ else {
   console.log(`完成 ${result.done.length} / 待跑 ${result.pending.length} / 丢弃 ${result.discarded.length} / 跳过 ${result.skipped.length}`);
   if (nextBatches.length) console.log(`下一批：${nextBatches.slice(0, 5).join(", ")}${nextBatches.length > 5 ? " …" : ""}`);
   if (pendingSteps.length) console.log(`待办步骤：${pendingSteps.map((s) => s.id).join(", ")}`);
+  if (payload.partial_batches.length) {
+    for (const p of payload.partial_batches) console.log(`未完成批：${p.batch} 已填 ${p.filled} 格，从 ${p.next_cell} 继续`);
+  }
   if (payload.interruptions.length) console.log(`历史中断：${payload.interruptions.length} 次`);
   console.log("\n从 next_batches 继续；每批完成后用 state.mjs batch 落盘。");
 }

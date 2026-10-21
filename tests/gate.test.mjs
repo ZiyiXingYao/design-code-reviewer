@@ -22,11 +22,11 @@ function finding(overrides = {}) {
 }
 
 function build(dir, opts = {}) {
-  scaffold(dir, { reviewType: "impl", steps: ["B0"], expected: { lens: 1 },
+  scaffold(dir, { reviewType: "impl", steps: ["B0"], expected: { lens: 20 },
     batches: [{ id: "b01", group: "s3", unit: "镜头2", kind: "discrete" }], bench: "L2" });
   putBatch(dir, {
     batch: "b01", group: "s3", unit: "镜头2", kind: "discrete", status: "done",
-    covers: [{ kind: "lens", id: "2" }], findings: opts.findings ?? [finding()]
+    covers: Array.from({ length: 20 }, (_, i) => ({ kind: "lens", id: String(i + 1) })), findings: opts.findings ?? [finding()]
   });
   writeVerdicts(dir, {
     accusations: [{ id: "A-001", source_findings: ["F-001"], location: "x", mechanism: "m", consequence: "c" }],
