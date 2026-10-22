@@ -48,7 +48,8 @@ const result = {
   base: null,
   submodules: [],
   design: { present: false, files: [], state: null, task_md: false, diagrams: false },
-  handoff: null,
+  mode: null,
+  range: null,
   bench: "L0",
   reasons: [],
   failures: []
@@ -87,16 +88,16 @@ if (existsSync(archState)) {
   }
 }
 
-// 交接块
-const auditDir = join(root, "specs", "audit");
-if (existsSync(auditDir)) {
-  for (const d of readdirSync(auditDir)) {
-    const p = join(auditDir, d);
-    if (!statSync(p).isDirectory()) continue;
-    const report = join(p, "REPORT.md");
-    if (existsSync(report) && /##\s*交接块/.test(readFileSync(report, "utf8"))) result.handoff = relative(root, report);
-  }
+// 模式：从评审目录的 state.yaml 读取（impl 默认 delta；显式 --mode 优先）
+const stateFile = join(outDir, "state.yaml");
+let reviewState = null;
+if (existsSync(stateFile)) {
+  try { reviewState = parseYaml(readFileSync(stateFile, "utf8")); } catch { reviewState = null; }
 }
+const modeArg = process.argv.indexOf("--mode");
+result.mode = modeArg > 0 ? process.argv[modeArg + 1] : (reviewState?.mode || "delta");
+result.range = reviewState?.range || null;
+if (reviewState && result.mode === "delta" && !result.range?.from) result.failures.push("增量模式缺变更区间（state.range.from）");
 
 // 等级判定
 const required = ["00-接口契约.md", "01-架构设计.md", "02-实体与数据设计.md"];
@@ -108,13 +109,10 @@ if (!result.design.present || !complete) {
   result.bench = "L0";
   result.reasons.push(complete ? "无设计文档" : `设计产物不全：缺 ${[...missing, modules.length ? "" : "模块文档"].filter(Boolean).join("、")}`);
 } else if (result.design.state !== "closed") {
-  result.bench = "L0";
-  result.reasons.push(`设计未冻结（state=${result.design.state || "缺失"}），不做对照`);
-} else if (result.handoff) {
-  result.bench = "L2";
-} else {
   result.bench = "L1";
-  result.reasons.push("无 Gate D 交接块，基准未审");
+  result.reasons.push(`设计齐全但未冻结（state=${result.design.state || "缺失"}），基准未审`);
+} else {
+  result.bench = "L2";
 }
 
 mkdirSync(outDir, { recursive: true });
@@ -135,6 +133,6 @@ else {
   if (result.reasons.length) for (const r of result.reasons) console.log(`  - ${r}`);
   console.log(`子模块：${result.submodules.length ? result.submodules.map((s) => `${s.path}(${s.files})`).join(", ") : "无"}`);
   console.log(`设计产物：${result.design.files.length} 份；state=${result.design.state ?? "缺失"}；task.md=${result.design.task_md}`);
-  console.log(`交接块：${result.handoff ?? "无"}`);
+  console.log(`模式：${result.mode}${result.range?.from ? ` ${result.range.from}..${result.range.to}` : ""}`);
   if (result.failures.length) for (const f of result.failures) console.log(`  ! ${f}`);
 }

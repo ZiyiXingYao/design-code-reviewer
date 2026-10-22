@@ -41,27 +41,29 @@ test("无设计 -> L0", () => {
   assert.equal(r.out.bench, "L0");
 });
 
-test("设计齐全且 closed 无交接块 -> L1", () => {
+test("设计齐全且 closed -> L2（不看评审报告）", () => {
   const dir = base();
   withDesign(dir);
-  const r = run(dir);
-  assert.equal(r.out.bench, "L1");
-});
-
-test("有交接块 -> L2", () => {
-  const dir = base();
-  withDesign(dir);
-  mkdirSync(join(dir, "specs", "audit", "2026-01-01-design"), { recursive: true });
-  writeFileSync(join(dir, "specs", "audit", "2026-01-01-design", "REPORT.md"), "## 交接块（供 impl 读取）\n- C-1 x\n");
   const r = run(dir);
   assert.equal(r.out.bench, "L2");
 });
 
-test("draft -> L0", () => {
+test("设计齐全但未冻结 -> L1", () => {
   const dir = base();
   withDesign(dir, "draft");
   const r = run(dir);
-  assert.equal(r.out.bench, "L0");
+  assert.equal(r.out.bench, "L1");
+  assert.ok(r.out.reasons.some((x) => x.includes("未冻结")));
+});
+
+test("设计评审报告不再影响基准等级", () => {
+  const dir = base();
+  withDesign(dir, "draft");
+  mkdirSync(join(dir, "specs", "audit", "2026-01-01-design"), { recursive: true });
+  writeFileSync(join(dir, "specs", "audit", "2026-01-01-design", "REPORT.md"), "## 交接块\n- C-1 x\n");
+  const r = run(dir);
+  assert.equal(r.out.bench, "L1");
+  assert.equal(r.out.handoff, undefined);
 });
 
 test("--require-design 在 L0 时拒绝运行并写 preflight-failed.md", () => {

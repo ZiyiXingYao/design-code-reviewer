@@ -19,11 +19,12 @@ export function scaffold(dir, {
   bench = "L2",
   mode = "full",
   from = "",
-  to = "HEAD"
+  to = "HEAD",
+  scopeFile = ""
 } = {}) {
   initReview(dir, {
     type: reviewType, tier, expected, steps, batches,
-    mode, from, to,
+    mode, from, to, scopeFile,
     commit, designState: "closed", reopen: 0, bench
   });
   for (const id of steps) {
@@ -59,7 +60,7 @@ export function writeVerdicts(dir, { accusations, defenses, verdicts, stats }) {
   writeFileSync(join(dir, "08-verdict.json"), JSON.stringify({ verdicts, stats }, null, 2));
 }
 
-export function writeReports(dir, { bench = "L2", extra = "", findings = [] } = {}) {
+export function writeReports(dir, { bench = "L2", extra = "", findings = [], mode = "full", from = "", to = "HEAD" } = {}) {
   const blocks = findings
     .filter((f) => ["P0", "P1"].includes(f.level))
     .map((f) => `### ${f.id} ${f.title}
@@ -70,8 +71,11 @@ export function writeReports(dir, { bench = "L2", extra = "", findings = [] } = 
 - **会怎样**：${f.counterexample || "给定X→Y→缺Z"}
 - **怎么改**：${f.suggestion || "补机制"}
 `).join("\n");
+  const modeLine = mode === "delta"
+    ? `评审模式：增量 ${from}..${to}`
+    : "评审模式：全量（工作区当前版本）";
   writeFileSync(join(dir, "REPORT.md"), `# 评审报告
-评审模式：全量（工作区当前版本）
+${modeLine}
 基准：${bench}
 
 ## 1 结论摘要

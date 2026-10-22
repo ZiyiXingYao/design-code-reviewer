@@ -127,13 +127,14 @@ function initDesign(root, id) {
 
 function initImpl(root, id) {
   const dir = workDir(root, id);
-  initReview(dir, { type: "impl", reviewId: id, root, mode: "delta", from: "abc1234", to: "def5678", expected: implPlan().expected, steps: ["B0"], batches: implPlan().batches });
+  initReview(dir, { type: "impl", reviewId: id, root, mode: "delta", from: "abc1234", to: "def5678", expected: implPlan().expected, steps: ["B0"], batches: implPlan().batches, scopeFile: "design-scope.json" });
   updateState(dir, (s) => { s.state = "verifying"; s.steps.B0 = { status: "done", at: new Date().toISOString() }; });
   seedAgents(dir);
   commitBatch(dir, { payload: { batch: "b01", group: "s3", unit: "20 镜头", kind: "discrete", status: "done", covers: Array.from({ length: 20 }, (_, i) => ({ kind: "lens", id: String(i + 1) })), findings: [], coverage_note: "ok", cross_hints: [] } });
   seedFindings(dir, { type: "impl", level: "P1" });
   J(join(dir, "preflight.json"), { failures: [] });
-  writeFileSync(join(dir, "REPORT.md"), "# 实现评审报告\n评审模式：增量 abc1234..def5678\n基准：L1\nGate I 结论：有条件通过\n\n发现 F-001。\n对抗：成立率 1.00 / 有效辩护率 0.00 / 升级率 0.00 / 未决率 0.00\n\n## 7 发现清单\n\n### F-001 示例缺陷\n\n- **在哪**：`src/order/order_service.cpp:10`（OrderService::Create）＋ 设计对照 `03-订单模块.md:20`（§3.1）\n  - 模块：订单｜镜头：04 错误处理｜流程：示例流程\n- **什么问题**：缺少校验\n- **会怎样**：给定非法输入 → 越界 → 因为没有校验\n- **怎么改**：第一步补校验；第二步加回归用例\n");
+  writeFileSync(join(dir, "design-scope.json"), JSON.stringify({ mode: "delta", from: "abc1234", to: "def5678", code_files: [{ path: "src/order/order_service.cpp", status: "M" }], design: [{ path: "specs/design/03-订单模块.md", sections: [{ title: "3.1", line: 20 }], tokens: ["order_service"] }], unmatched: [] }, null, 2));
+  writeFileSync(join(dir, "REPORT.md"), "# 实现评审报告\n评审模式：增量 abc1234..def5678\n设计基准：specs/design/03-订单模块.md（§3.1）\n基准：L1\nGate I 结论：有条件通过\n\n发现 F-001。\n对抗：成立率 1.00 / 有效辩护率 0.00 / 升级率 0.00 / 未决率 0.00\n\n## 7 发现清单\n\n### F-001 示例缺陷\n\n- **在哪**：`src/order/order_service.cpp:10`（OrderService::Create）＋ 设计对照 `03-订单模块.md:20`（§3.1）\n  - 模块：订单｜镜头：04 错误处理｜流程：示例流程\n- **什么问题**：缺少校验\n- **会怎样**：给定非法输入 → 越界 → 因为没有校验\n- **怎么改**：第一步补校验；第二步加回归用例\n");
   writeFileSync(join(dir, "SUMMARY.md"), summaryMd("有条件通过", "L1"));
   const t = run("skills/impl-review/scripts/state.mjs", ["transition", dir, "reported", "--reason", "B9 完成"]);
   if (t.status !== 0) throw new Error("transition reported 失败：" + t.stderr);
@@ -236,13 +237,13 @@ ok("impl: approve 交付 3 件", () => {
 
 // ---------- 4 工具链 ----------
 console.log("== 4 工具链 ==");
-ok("preflight：mini-design 判 L1", () => {
+ok("preflight：mini-design 齐全且 closed 判 L2", () => {
   const project = join(mk("dcr-dry-tools-"), "project");
   cpSync(join(ROOT, "examples/mini-design"), project, { recursive: true });
   const r = run("skills/impl-review/scripts/preflight.mjs", [project, "--json"]);
-  eq(JSON.parse(r.stdout).bench, "L1", "基准等级");
+  eq(JSON.parse(r.stdout).bench, "L2", "基准等级");
 });
-ok("claims：diagrams 与交接块 C-n 进入断言", () => {
+ok("claims：只读设计文档，diagrams 进入断言且不继承评审结论", () => {
   const project = join(mk("dcr-dry-claims-"), "project");
   cpSync(join(ROOT, "examples/mini-design"), project, { recursive: true });
   mkdirSync(join(project, "specs/design/diagrams"), { recursive: true });
@@ -251,8 +252,8 @@ ok("claims：diagrams 与交接块 C-n 进入断言", () => {
   writeFileSync(join(project, "specs/audit/2026-01-01-design/REPORT.md"), "## 交接块\n- C-1 主实体可跨分区 → 状态键按分区聚合\n");
   const r = run("skills/impl-review/scripts/claims.mjs", [project, "--json"]);
   const j = JSON.parse(r.stdout);
-  truthy(j.assertions.some((a) => a.kind === "constraint" && a.unverifiable), "缺 C-n 断言");
   truthy(j.assertions.some((a) => a.kind === "call" || a.file), "缺 diagrams 断言");
+  truthy(!j.assertions.some((a) => a.kind === "constraint"), "不应再继承交接块 C-n");
 });
 ok("smells：可运行且不判严重性", () => {
   const r = run("skills/impl-review/scripts/smells.mjs", [join(ROOT, "examples/mini-design"), "--json"]);
@@ -350,6 +351,19 @@ ok("P0 写「通过」：G18 拒绝", () => {
   writeFileSync(join(dir, "REPORT.md"), "# r\nGate D 结论：通过\n");
   eq(gateCheck(dir, "G18").ok, false, "未拒绝");
 });
+ok("design delta：缺 scope.json → G23 拒绝", () => {
+  const root = mk("dcr-dry-delta-");
+  const dir = workDir(root, "2026-01-01-design");
+  initReview(dir, {
+    type: "design", reviewId: "2026-01-01-design", root, mode: "delta", from: "abc1234", to: "def5678",
+    expected: { dimension: 1, scenario: 1, completeness: 20 }, steps: ["A0"],
+    batches: [{ id: "b01", group: "s1", unit: "D1", kind: "discrete" }]
+  });
+  updateState(dir, (s) => { s.state = "reported"; s.steps.A0 = { status: "done", at: new Date().toISOString() }; });
+  writeFileSync(join(dir, "REPORT.md"), "# r\n评审模式：增量 abc1234..def5678\nGate D 结论：不通过\n");
+  eq(gateCheck(dir, "G23").ok, false, "未拒绝");
+});
+
 ok("旧式压缩报告（05:338 + 无四段）：G20 拒绝", () => {
   const root = mk("dcr-dry-g20-");
   const dir = initDesign(root, "2026-01-01-design");

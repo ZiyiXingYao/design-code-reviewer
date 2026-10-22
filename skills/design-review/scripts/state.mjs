@@ -75,7 +75,11 @@ switch (cmd) {
       expected: spec.expected || {},
       steps: spec.steps || [],
       batches: spec.batches || [],
-      planExtra: spec.coverage_floor_exempt ? { coverage_floor_exempt: true } : {},
+      planExtra: {
+        ...(spec.coverage_floor_exempt ? { coverage_floor_exempt: true } : {}),
+        ...(spec.scope_file ? { scope_file: spec.scope_file } : {})
+      },
+      scopeFile: spec.scope_file || "",
       commit: args.commit || "",
       designState: args["design-state"] || "",
       reopen: args.reopen ? Number(args.reopen) : 0,

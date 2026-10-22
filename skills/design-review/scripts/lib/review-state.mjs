@@ -367,7 +367,8 @@ export function initReview(dir, opts) {
     expected: opts.expected || {},
     steps: opts.steps || [],
     batches: opts.batches || [],
-    ...(opts.planExtra || {})
+    ...(opts.planExtra || {}),
+    ...(opts.scopeFile ? { scope_file: opts.scopeFile } : {})
   };
   if (!plan.batches.length) throw new Error("plan 必须至少包含一个批次");
   for (const b of plan.batches) {

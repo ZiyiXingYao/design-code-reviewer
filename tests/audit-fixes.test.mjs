@@ -27,12 +27,12 @@ function mkReview(root, id, type = "design", expected = { dimension: 15 }) {
 }
 const J = (p, o) => writeFileSync(p, JSON.stringify(o, null, 2));
 
-test("两份 gate 检查项一致（G1–G20）", () => {
+test("两份 gate 检查项一致（G1–G23）", () => {
   const ids = (p) => [...readFileSync(p, "utf8").matchAll(/check\("(G[0-9]+[a-z]?)/g)].map((m) => m[1]).sort();
   const a = ids("/code/design-code-reviewer/skills/design-review/scripts/gate.mjs");
   const b = ids("/code/design-code-reviewer/skills/impl-review/scripts/gate.mjs");
   assert.deepEqual(a, b);
-  assert.ok(a.includes("G15") && a.includes("G16") && a.includes("G17") && a.includes("G20"));
+  assert.ok(a.includes("G15") && a.includes("G16") && a.includes("G17") && a.includes("G20") && a.includes("G23"));
 });
 
 test("stats：defended 与 valid_defense_rate、升级率用首轮分母", () => {
@@ -115,7 +115,7 @@ test("ledger：sync 记 reviews，accepted 记接受人与补偿", () => {
   assert.equal(e.acceptance.compensation, "加监控");
 });
 
-test("claims：交接块 C-n 进入断言集并标 unverifiable", () => {
+test("claims：不读设计评审报告；设计文档照常抽断言", () => {
   const root = mkdtempSync(join(tmpdir(), "dcr-fix-claims-"));
   mkdirSync(join(root, "specs", "design"), { recursive: true });
   mkdirSync(join(root, "specs", "audit", "2026-01-01-design"), { recursive: true });
@@ -124,5 +124,20 @@ test("claims：交接块 C-n 进入断言集并标 unverifiable", () => {
   const out = run(CLAIMS, [root, "--json"]);
   assert.equal(out.status, 0, out.stderr);
   const j = JSON.parse(out.stdout);
-  assert.ok(j.assertions.some((a) => a.kind === "constraint" && a.unverifiable));
+  assert.ok(j.assertions.some((a) => a.token === "OrderId"));
+  assert.equal(j.assertions.some((a) => a.kind === "constraint"), false, "不得再继承交接块 C-n");
+});
+
+test("claims --design-scope：只抽命中的设计文档", () => {
+  const root = mkdtempSync(join(tmpdir(), "dcr-fix-claims2-"));
+  mkdirSync(join(root, "specs", "design"), { recursive: true });
+  writeFileSync(join(root, "specs", "design", "00-接口契约.md"), "## 总则\n\n`OrderId`\n");
+  writeFileSync(join(root, "specs", "design", "05-设备域.md"), "## 状态\n\n`DeviceCode`\n");
+  const scope = join(root, "design-scope.json");
+  writeFileSync(scope, JSON.stringify({ design: [{ path: "specs/design/05-设备域.md" }] }));
+  const out = run(CLAIMS, [root, "--json", "--design-scope", scope]);
+  assert.equal(out.status, 0, out.stderr);
+  const j = JSON.parse(out.stdout);
+  assert.ok(j.assertions.some((a) => a.token === "DeviceCode"));
+  assert.equal(j.assertions.some((a) => a.token === "OrderId"), false);
 });

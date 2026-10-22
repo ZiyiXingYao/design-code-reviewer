@@ -26,9 +26,9 @@ description: 评审代码实现是否兑现了 brainstorming-archify 的设计�
 | 步 | 动作 | 产出 | 退出条件 |
 |---|---|---|---|
 | **B0 体检 + 基准** | `preflight.mjs`：子模块、基线 sha、L0/L1/L2 | `preflight.json` | 等级已判定；子模块问题已声明 |
-| **B1 锁范围** | `git diff base...HEAD --stat`；>400 行或 >10 文件切片 | 范围清单 | 范围固定 |
+| **B1 锁范围** | `delta`：`git diff from..to --stat`；`full`：整仓代码（排除 vendor/build/third_party）按设计模块切片 | 范围清单 | 范围固定 |
 | **B1.5 批计划 + 材料路由** | 镜头按批切分 + 每组材料清单 | `plan.json` | 批次数固定 |
-| **B2 读交接块** | 取基线、欠账白名单、`C-n` | 基准清单 | 基准就位 |
+| **B2 锁定设计基准** | `full`：全部 `specs/design`；`delta`：`related-design.mjs` 命中的设计章节 | 基准清单 | 基准就位 |
 | **B3 抽断言** | `claims.mjs` | `claims.json` | 断言数确定 |
 | **B4 机械核对** | 全仓核符号 + 三态归类 | `claims-verify.md` | 三态齐备 |
 | **B5 逐镜头扫描** | `smells.mjs` 出信号 → 20 镜头深读 | 原始发现 | 20 镜头全有结论 |
@@ -44,13 +44,13 @@ description: 评审代码实现是否兑现了 brainstorming-archify 的设计�
 
 | 等级 | 条件 | 门禁效力 |
 |---|---|---|
-| **L2** | 设计齐全 + state=closed + 有 Gate D 交接块 | 可作放行依据 |
-| **L1** | 设计齐全 + state=closed，无 Gate D 报告 | 可作门禁，注明基准未审 |
+| **L2** | 设计齐全 + `state=closed` | 可作放行依据 |
+| **L1** | 设计齐全但未冻结（state≠closed） | 可作门禁，注明基准未冻结 |
 | **L0** | 无设计 / draft·explore / 仅部分文档 / 只改代码 | **不作放行依据** |
 
 - L0 是完整评审：镜头 1–20 全跑；**镜头 0 跳过并标注**（不许用代码反推需求）。
 - 用户可传 `--require-design`：产物不全时 `preflight.mjs` 拒绝运行并写 `preflight-failed.md`。
-- L2 才继承交接块的欠账白名单与 `C-n` 约束。
+- 设计基准只来自 `specs/design/` 与 archify `state.yaml`：**不读、不继承** design-review 的任何结论或交接块。
 
 ## 4 五类对照（缺任一类都不算"对照过设计"）
 
@@ -58,7 +58,7 @@ description: 评审代码实现是否兑现了 brainstorming-archify 的设计�
 
 | # | 类型 | 设计侧来源 | 代码侧核对 | 对不上算 |
 |---|---|---|---|---|
-| 1 | 结构 | 契约清单表、类清单、文件树 | schema、类定义、目录 | DR-1 / DR-6 |
+| 1 | 结构 | 契约清单表、类清单、文件树 | schema、类定义、目录 | DR-1（代码有文档无只记 DR-6 提示） |
 | 2 | 行为 | 流程章节、状态机、时序图 | 分支、状态枚举、调用链 | DR-3 |
 | 3 | 需求 | task.md `[实现的功能]` | 代码改动位置 | P1 |
 | 4 | 约束 | task.md `[实现的约束]`、D-nnn | diff 检查被禁改动 | **P0** |
@@ -82,7 +82,7 @@ description: 评审代码实现是否兑现了 brainstorming-archify 的设计�
 
 ## 6 漂移分类
 
-DR-1 无实现 / DR-2 改名未回写 / DR-3 行为不符 / DR-4 残留 / DR-5 内部矛盾 / DR-6 未设计实现 / DR-7 模板不合规 / DR-8 承诺未兑现。
+DR-1 无实现 / DR-2 改名未回写 / DR-3 行为不符 / DR-4 残留 / DR-5 内部矛盾 / DR-6 设计缺口（只记提示，不计缺陷）/ DR-7 模板不合规 / DR-8 承诺未兑现。
 级别与判据见 `drift.md`。**DR-8 = P0**。
 
 ## 7 状态与落盘
@@ -92,7 +92,8 @@ DR-1 无实现 / DR-2 改名未回写 / DR-3 行为不符 / DR-4 残留 / DR-5 �
 node <skill-root>/scripts/state.mjs init <projectRoot> --type impl --plan <plan.json> [--mode delta --from <rev> --to <rev>|--mode full] [--bench L2] [--id <id>]
 
 node <skill-root>/scripts/preflight.mjs <projectRoot> [--require-design] --out <reviewDir>
-node <skill-root>/scripts/claims.mjs <projectRoot> --out <reviewDir>/claims.json
+node <skill-root>/scripts/related-design.mjs <projectRoot> --from <rev> --to <rev> --out <reviewDir>   # 仅 delta
+node <skill-root>/scripts/claims.mjs <projectRoot> --out <reviewDir>/claims.json [--design-scope <reviewDir>/design-scope.json]
 node <skill-root>/scripts/smells.mjs <projectRoot> --json --out <reviewDir>/smells.json
 node <skill-root>/scripts/state.mjs batch <reviewDir> --payload <b01.json> --agent sub-a01
 node <skill-root>/scripts/state.mjs partial <reviewDir> --batch b08 --payload <part.json>
@@ -141,4 +142,5 @@ G20 报告自包含：P0/P1 每条须有独立小节且含「在哪 / 什么问�
 
 - 不评架构合理性、技术选型（Gate D 的事）。
 - L0 通过 ≠ 功能实现了需求——它只代表代码内部自洽、没查出这类缺陷。
+- **设计未覆盖不算错**：代码里有、设计文档没写的实现，记「设计缺口」提示（报告 §5），不计 P0–P2、不进对抗、不进 task.md。只有"文档写了、代码没做"（DR-1）才算缺陷。
 - 不保证抓全缺陷；保证的是漏了什么你能看见（覆盖矩阵、未核对项）。

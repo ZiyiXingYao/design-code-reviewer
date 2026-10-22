@@ -1,13 +1,13 @@
 ---
 name: design-review
-description: 评审 brainstorming-archify 产出的设计方案（00 接口契约 / 01 架构 / 02 数据 / 03+ 模块 / task.md / 时序图），判断方案是否合理、功能是否完整、产物是否合规，并在报告末尾生成交接块供 impl-review 技能使用。触发语：评审设计方案、这个架构合理吗、模块划分有没有问题、功能全不全、这份设计能不能开工、设计文档评审。
+description: 评审 brainstorming-archify 产出的设计方案（00 接口契约 / 01 架构 / 02 数据 / 03+ 模块 / task.md / 时序图），判断方案是否合理、功能是否完整、产物是否合规。支持全量评审与指定版本区间的增量评审。触发语：评审设计方案、这个架构合理吗、模块划分有没有问题、功能全不全、这份设计能不能开工、设计文档评审。
 ---
 
 # 设计评审（design）
 
 评审对象是 **archify 产物本身**：内容合理性 + 产物工艺合规。**完全不读代码**（唯一例外：task.md 里引用的目录名）。
 
-本技能与 `impl-review` 互不调用。唯一交接物是报告末尾的**交接块**。
+本技能与 `impl-review` 互不调用，也不向其传递任何结果：impl 直接以 `specs/design/` 为基准。
 
 `<skill-root>` = 本文件所在目录。所有脚本零依赖，用 `node <skill-root>/scripts/<name>.mjs` 调用。
 
@@ -54,7 +54,7 @@ node <skill-root>/scripts/docstat.mjs <projectRoot> [--json]
 | **A5a 红队** | 按弹药库对全部 P0/P1 候选发指控 | `06-accusations.json` | 每条含位置+机制+后果；有 coverage_note |
 | **A5b 蓝队** | 逐条辩护或承认 | `07-defense.json` | 每条有结论；无效辩护视为承认 |
 | **A5c 裁判** | 三态裁断，禁止折中 | `08-verdict.json` | 只有 upheld/dismissed/unresolved |
-| **A6 定级成文** | 按裁断定级 → `REPORT.md`（11 节 + 交接块；§7 的 P0/P1 逐条四段式） | 报告 | gate G20 通过 |
+| **A6 定级成文** | 按裁断定级 → `REPORT.md`（11 节；§7 的 P0/P1 逐条四段式） | 报告 | gate G20 通过 |
 | **A7 收口 + 交付** | `SUMMARY.md` + gate，再把 REPORT/SUMMARY 交付到 `specs/audit/<id>/` | 2 页说明书 + 交付目录 2 件 | gate 通过；交付目录 2 件与工作副本一致 |
 | **A8 人工评审 + task.md** | 把**已交付的成品**交人评审；批准后生成修复任务清单并关闭 | `task.md` | `approve` 成功，状态 `closed` |
 
@@ -96,6 +96,7 @@ node <skill-root>/scripts/state.mjs stats <reviewDir> --accusations 27 --upheld 
 node <skill-root>/scripts/state.mjs transition <reviewDir> reported --reason "A6 完成"   # 自动交付 REPORT/SUMMARY 到 specs/audit/<id>/
 
 # 闸门与交付（reported 即可评审；报告修订后 deliver 刷新；批准后才生成 task.md 并 closed）
+node <skill-root>/scripts/scope.mjs <projectRoot> --from <rev> --to <rev> --out <reviewDir>   # 仅 delta：算变更文件与受影响章节
 node <skill-root>/scripts/gate.mjs <reviewDir>
 node <skill-root>/scripts/state.mjs deliver <reviewDir>        # 答复评审意见、报告修订后重新交付
 node <skill-root>/scripts/state.mjs approve <reviewDir> --reviewer "<姓名>" [--note "…"] [--include-p2]
@@ -117,6 +118,7 @@ node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 - gate 的覆盖下限：design 标准档 15 维/17 卡/20 格（格数须为 20 的倍数）；确需更小范围用 `plan.coverage_floor_exempt` 或 `gate --allow-partial-coverage`。
 - **G20 报告自包含**：P0/P1 每条须有独立小节且含「在哪 / 什么问题 / 怎么改」，位置禁止 `05:338` 式缩写；P0/P1 不许只给压缩表格。`05-findings.json` 是证据库，不能替报告正文。
 - **两种模式**：`full`（默认）审 `specs/design/` 当前全部内容，**不查提交历史**、报告不写基线 commit；`delta` 必须给 `--from/--to`，只审该区间的设计变更及其引用/被引用章节，报告须声明"只覆盖该区间"。
+- **delta 流程**：`init --mode delta --from A --to B` → `scope.mjs` 产出 `scope.json` → `plan.json` 写 `scope_file: "scope.json"` 与受影响面 `expected` → 只批受影响维度/场景/漏项 → 报告列出全部变更文件与「未覆盖声明」。
 - **人工评审是独立一步**：报告写完停 `reported`，等待用户确认；批准人必须显式传给 `--reviewer`。
 - **请人评审时必须报清交付状态**：给出交付目录路径、已落地文件清单，并说明 `task.md` 待批准后生成。不许只说"报告写好了"——评审者会打开 `specs/audit/<id>/`，那里必须有东西。
 
@@ -136,7 +138,7 @@ node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 └── task.md              # 批准后生成（工作副本）
 
 <projectRoot>/specs/audit/<YYYY-MM-DD>-design/            # 交付目录（只放成品）
-├── REPORT.md            # 11 节 + 交接块（进入 reported 即就位）
+├── REPORT.md            # 11 节（进入 reported 即就位）
 ├── SUMMARY.md           # ≤2 页（进入 reported 即就位）
 └── task.md              # 修复任务清单（人工批准后生成）
 ```
@@ -153,7 +155,7 @@ node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 | `completeness.md` | 20 漏项 + 两级筛 | A3 |
 | `scenarios.md` | 17 张场景卡 | A4 |
 | `findings.md` | 反例构造、P0–P3、取证格式、去重、排序 | A4.5/A6 |
-| `report.md` | 11 节模板 + 交接块 + Gate D 条件 | A6 |
+| `report.md` | 11 节模板 + Gate D 条件 | A6 |
 | `adversarial/*.md` | 子代理任务书（orchestrator/scout/red/blue/judge/meta） | A5 |
 | `profiles/` | 语言/行业特化（只增不改，见 profiles/README.md） | 按需 |
 

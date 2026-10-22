@@ -9,7 +9,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { loadPlan, loadState, listBatchFiles, loadBatches, computeCoverage } from "./lib/review-state.mjs";
 import { checkFloor } from "./lib/plan-floor.mjs";
 
@@ -205,7 +205,7 @@ const verdict = readJson(join(dir, "08-verdict.json"));
   check("G13 步骤顺序", problems.length === 0, problems.join("；") || "去重先于对抗", false);
 }
 
-// G9 收口完整（SUMMARY 六节 + design 交接块）
+// G9 收口完整（SUMMARY 六节 + 无重复发现）
 {
   const summary = read(join(dir, "SUMMARY.md"));
   const report = read(join(dir, "REPORT.md"));
@@ -213,7 +213,6 @@ const verdict = readJson(join(dir, "08-verdict.json"));
   const missing = summary ? need.filter((h) => !new RegExp(`^##+ .*${h}`, "m").test(summary)) : need;
   const problems = [];
   if (missing.length) problems.push(`SUMMARY 缺节：${missing.join(",")}`);
-  if (plan.review_type === "design" && report && !/##\s*交接块/.test(report)) problems.push("设计报告缺交接块");
 
   // 重复发现（同标题 + 同位置）
   const seen = new Map();
@@ -222,7 +221,7 @@ const verdict = readJson(join(dir, "08-verdict.json"));
     if (seen.has(key)) problems.push(`重复发现：${seen.get(key)} 与 ${f.id}`);
     else seen.set(key, f.id);
   }
-  check("G9 收口完整", problems.length === 0, problems.join("；") || "SUMMARY 六节齐全，交接块存在，无重复发现");
+  check("G9 收口完整", problems.length === 0, problems.join("；") || "SUMMARY 六节齐全，无重复发现");
 
   // P0/P1 的 depends_on：只在缺失时提示，不阻断
   const noDep = findings.filter((f) => ["P0", "P1"].includes(f.level) && !Array.isArray(f.depends_on)).map((f) => f.id);
@@ -402,6 +401,32 @@ const verdict = readJson(join(dir, "08-verdict.json"));
     problems.push("state.range 与 plan.range 不一致");
   }
   check("G22 范围一致性", problems.length === 0, problems.join("；") || "mode / range 与计划一致");
+}
+
+// G23 增量设计范围：design-scope.json 必须存在、区间一致、报告覆盖涉及的设计文档
+{
+  if (state.mode !== "delta") {
+    check("G23 增量设计范围", true, "非 delta，跳过", false);
+  } else {
+    const problems = [];
+    const file = plan.scope_file || "design-scope.json";
+    const sp = join(dir, file);
+    if (!existsSync(sp)) problems.push(`缺 ${file}（先跑 related-design.mjs）`);
+    else {
+      let sc = null;
+      try { sc = JSON.parse(readFileSync(sp, "utf8")); } catch { problems.push(`${file} 不是合法 JSON`); }
+      if (sc) {
+        const range = state.range || {};
+        if (sc.from !== range.from || (sc.to || "") !== (range.to || "HEAD")) problems.push("design-scope.json 的区间与 state.range 不一致");
+        const report = read(join(dir, "REPORT.md")) || "";
+        const docs = sc.design || [];
+        if (!docs.length) problems.push("design-scope.json 未命中任何设计文档（全部为设计缺口？请人工确认）");
+        for (const d of docs) if (!report.includes(basename(d.path))) problems.push(`报告未涉及设计文档 ${basename(d.path)}`);
+        if ((sc.unmatched || []).length && !/设计缺口/.test(report)) problems.push("存在设计未覆盖的代码，报告须登记「设计缺口」提示");
+      }
+    }
+    check("G23 增量设计范围", problems.length === 0, problems.slice(0, 10).join("；") || "设计范围已覆盖");
+  }
 }
 
 // 汇总

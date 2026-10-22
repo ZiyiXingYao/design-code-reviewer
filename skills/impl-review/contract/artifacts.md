@@ -13,14 +13,14 @@
 | `specs/design/task.md` | 否 | 需求/约束/验收三类对照 | 跳过承诺核验；镜头 0 无法执行 |
 | `specs/design/diagrams/` | 否 | 调用顺序 | 该节跳过并注明 |
 | `.brainstorming-archify/state.yaml` | 否 | 基准等级判定 | 保守判 L0 |
-| `specs/audit/*-design/`（交接块） | 否 | 欠账白名单 + 设计约束 `C-n` | 无继承，L1 封顶 |
+| `specs/audit/*-design/` | **不读** | 设计评审结果不参与实现评审 | 不降级；基准只取设计文档与 archify state |
 
 ## 2 基准等级 L0 / L1 / L2
 
 | 等级 | 判定 | 报告标注 |
 |---|---|---|
-| L2 | 设计齐全 + `state=closed` + 存在 Gate D 交接块 | `基准: L2（设计已过审）` |
-| L1 | 设计齐全 + `state=closed`，无 Gate D 报告 | `基准: L1（设计未过审）` |
+| L2 | 设计齐全 + `state=closed` | `基准: L2（设计已冻结）` |
+| L1 | 设计齐全但未冻结（state≠closed） | `基准: L1（设计未冻结）` |
 | L0 | 无设计 / `draft`·`explore` / 仅部分文档 / 只改代码 | `基准: L0（未做设计对照）` |
 
 规则：
@@ -64,24 +64,22 @@ schema 与 design 侧一致（`schema_version/state/files/reopens/change_list/ta
 | 模块章节 | 模块 8 节是否齐 | 告警 |
 | state schema | 四个必需字段 | 缺 → 保守 L0 |
 
-## 6 交接块（设计评审产出）
+## 6 设计基准来源（不依赖任何评审结果）
 
-```markdown
-## 交接块（供 impl 读取，勿删）
-- 设计基线：specs/design @ <sha>
-- 设计状态：state=closed；reopen <N> 次
-- Gate D 结论：<有条件通过>
-- 已登记欠账（impl 只引用不重复报）：
-  - D-03 <模块未设计> → 记 DR-6 但不计 P1
-- 本次确立的设计约束（作为额外断言）：
-  - C-1 <主实体可跨分区> → 状态键必须按分区键聚合
-```
+实现评审只读两类输入：
 
-处理规则：
+| 输入 | 用途 |
+|---|---|
+| `specs/design/*.md` + `diagrams/` | 断言、结构/行为/需求/约束/验收对照 |
+| `.brainstorming-archify/state.yaml` | 基准等级（是否冻结） |
+
+规则：
 
 | 情况 | 处置 |
 |---|---|
-| 交接块存在 | 取基线、继承欠账白名单、把 `C-n` 加入断言集（最有价值的输入） |
-| 无交接块但设计齐全且 closed | 标「基准未审」，L1 |
-| 设计缺失/非 closed | 降 L0 |
-| 任何情况 | 不改写、不引用设计评审的判断结论 |
+| `full` | 对照全部设计文档 |
+| `delta` | 只对照 `design-scope.json` 命中的文档与章节；未命中部分记「设计缺口」提示 |
+| 设计评审报告（`specs/audit/*-design/`） | **不读、不继承**：它的结论、欠账、C-n 都不构成实现评审的基准 |
+| 设计缺失/非 closed | 按 L0 / L1 处理 |
+
+设计文档不可能面面俱到：代码里有、文档没写的实现属于**设计缺口**，只记提示，不算实现缺陷。

@@ -19,6 +19,19 @@ const outIdx = process.argv.indexOf("--out");
 const outFile = outIdx > 0 ? process.argv[outIdx + 1] : null;
 const scopeIdx = process.argv.indexOf("--scope");
 const scopes = scopeIdx > 0 ? process.argv[scopeIdx + 1].split(",").map((s) => s.trim()).filter(Boolean) : null;
+// delta：只抽 design-scope.json 命中的设计文档；full：全部设计文档
+const dscopeIdx = process.argv.indexOf("--design-scope");
+let designScope = null;
+if (dscopeIdx > 0) {
+  const f = process.argv[dscopeIdx + 1];
+  try {
+    const j = JSON.parse(readFileSync(f, "utf8"));
+    designScope = new Set((j.design || []).map((d) => d.path.split("/").pop()));
+  } catch (err) {
+    console.error(`claims: 读取 design-scope 失败：${err.message}`);
+    process.exit(2);
+  }
+}
 
 const CODE_EXT = new Set([".h", ".hpp", ".hh", ".c", ".cc", ".cpp", ".cxx", ".m", ".mm", ".js", ".mjs", ".ts", ".tsx", ".py", ".go", ".java", ".rs", ".proto", ".sql", ".json", ".yaml", ".yml", ".sh", ".cmake", ".txt"]);
 const SKIP_DIRS = new Set([".git", "node_modules", "build", "dist", "out", "third_party", "vendor", "specs", ".cache"]);
@@ -50,6 +63,7 @@ const assertions = [];
 const gaps = [];
 
 for (const name of readdirSync(designDir).filter((n) => n.endsWith(".md")).sort()) {
+  if (designScope && !designScope.has(name)) continue;
   const text = readFileSync(join(designDir, name), "utf8");
   const lines = text.split("\n");
   let inFence = false;
@@ -115,21 +129,7 @@ if (existsSync(diagramsDir)) {
   }
 }
 
-// 交接块：C-n 设计约束纳入断言集（不可机械匹配，标 unverifiable）
-const auditRoot = join(root, "specs", "audit");
-if (existsSync(auditRoot)) {
-  for (const d of readdirSync(auditRoot)) {
-    const rp = join(auditRoot, d, "REPORT.md");
-    if (!existsSync(rp)) continue;
-    const text = readFileSync(rp, "utf8");
-    const idx = text.indexOf("## 交接块");
-    if (idx < 0) continue;
-    for (const line of text.slice(idx).split("\n")) {
-      const m = line.match(/^-\s*(C-\d+)\s*[：:]?\s*(.+)$/);
-      if (m) assertions.push({ doc: "交接块", line: 0, token: `${m[1]} ${m[2]}`.slice(0, 120), kind: "constraint", manual: true });
-    }
-  }
-}
+// 设计基准只来自 specs/design，不读任何评审结果（无交接块依赖）
 
 // 去重
 const seen = new Set();
@@ -206,7 +206,7 @@ const out = {
   assertions: results,
   summary,
   numbering_gaps: realGaps,
-  note: "found/missing 为机械匹配；constraint（交接块 C-n）永不参与机械匹配，统一记 unverifiable。missing 必须人工归为 真缺失/改名未回写/表达差异"
+  note: "found/missing 为机械匹配；缺失必须人工归为 真缺失/改名未回写/表达差异。设计文档未覆盖的实现不构成断言，也不计缺陷"
 };
 
 if (outFile) writeFileSync(outFile, JSON.stringify(out, null, 2) + "\n");
