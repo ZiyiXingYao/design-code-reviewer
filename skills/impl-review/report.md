@@ -7,7 +7,9 @@
 基准：L2（设计已过审）        # L0 仅代码 / L1 设计对照 / L2 全量对照
 
 - 评审基线：<base sha>..<head sha>；改动 N 文件 +A/-D 行
-- 设计基准：<design commit>（来自交接块 / 或「未过 Gate D，基准可信度低」）
+- 评审模式：全量（整仓代码 vs 全部设计文档）／增量 <from>..<to>（代码变更 + 涉及的设计章节）
+- 代码范围：<整仓（排除 vendor/build/third_party）／变更文件清单>
+- 设计基准：`specs/design/`（全部文档 ／ 涉及章节清单）；state=<closed|confirm|draft>
 - 约束：只读，不改代码
 
 ## 0 流程执行摘要

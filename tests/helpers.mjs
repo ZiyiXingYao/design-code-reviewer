@@ -16,10 +16,14 @@ export function scaffold(dir, {
   expected = { dimension: 1 },
   batches = [{ id: "b01", group: "s1", unit: "维度D1", kind: "discrete" }],
   commit = "abc1234",
-  bench = "L2"
+  bench = "L2",
+  mode = "full",
+  from = "",
+  to = "HEAD"
 } = {}) {
   initReview(dir, {
     type: reviewType, tier, expected, steps, batches,
+    mode, from, to,
     commit, designState: "closed", reopen: 0, bench
   });
   for (const id of steps) {
@@ -67,6 +71,7 @@ export function writeReports(dir, { bench = "L2", extra = "", findings = [] } = 
 - **怎么改**：${f.suggestion || "补机制"}
 `).join("\n");
   writeFileSync(join(dir, "REPORT.md"), `# 评审报告
+评审模式：全量（工作区当前版本）
 基准：${bench}
 
 ## 1 结论摘要

@@ -2,7 +2,7 @@
 /**
  * 评审流程状态 CLI —— 唯一有权写 state.yaml 的入口。
  *
- *   state.mjs init <dir> --type design|impl --plan <plan.json> [--tier 标准档] [--commit sha]
+ *   state.mjs init <dir> --type design|impl --plan <plan.json> [--mode full|delta] [--from rev] [--to rev] [--tier 标准档]
  *   state.mjs recover <dir> [--json]
  *   state.mjs batch <dir> --payload <batch.json> [--agent id] [--ms n]
  *   state.mjs heartbeat <dir> --id b01 --beat 3
@@ -59,11 +59,17 @@ switch (cmd) {
     const root = resolve(args._[0] || ".");
     const id = args.id || makeReviewId(root, args.type);
     const reviewDir = workDir(root, id);
+    const mode = args.mode || (args.type === "impl" ? "delta" : "full");
+    if (!["full", "delta"].includes(mode)) fail(`未知 --mode：${mode}（full|delta）`);
+    if (mode === "delta" && !args.from) fail("增量模式必须给 --from <rev>（变更起点）");
     const spec = JSON.parse(readFileSync(resolve(args.plan), "utf8"));
     const state = initReview(reviewDir, {
       type: args.type,
       reviewId: id,
       root,
+      mode,
+      from: args.from || "",
+      to: args.to || "HEAD",
       tier: args.tier || "standard",
       maxConcurrency: args["max-concurrency"] ? Number(args["max-concurrency"]) : 4,
       expected: spec.expected || {},
@@ -75,7 +81,7 @@ switch (cmd) {
       reopen: args.reopen ? Number(args.reopen) : 0,
       bench: args.bench || ""
     });
-    console.log(JSON.stringify({ ok: true, review_id: id, dir: reviewDir, audit: auditDir(root, id), batches: state.plan.total_batches }, null, 2));
+    console.log(JSON.stringify({ ok: true, review_id: id, mode, range: state.range || null, dir: reviewDir, audit: auditDir(root, id), batches: state.plan.total_batches }, null, 2));
     break;
   }
   case "recover": {

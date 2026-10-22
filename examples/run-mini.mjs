@@ -60,7 +60,7 @@ const plan = {
 };
 writeFileSync(join(tmp, "plan.json"), JSON.stringify(plan, null, 2));
 initReview(review, {
-  type: "design", reviewId, root: project, tier: "standard",
+  type: "design", reviewId, root: project, tier: "standard", mode: "full",
   expected: plan.expected, steps: plan.steps,
   batches: plan.batches, planExtra: { coverage_floor_exempt: true },
   commit: "example", designState: "closed", reopen: 0
@@ -101,6 +101,7 @@ writeFileSync(join(review, "07-defense.json"), JSON.stringify({ defenses: [{ acc
 writeFileSync(join(review, "08-verdict.json"), JSON.stringify({ verdicts: [{ accusation_id: "A-001", decision: "upheld", level: "P1", reason: "机制成立" }], stats: { accusations: 1, upheld: 1, dismissed: 0, unresolved: 0, valid_defense: 0, defended: 1, first_round: 1 } }, null, 2));
 writeFileSync(join(review, "05-findings.json"), JSON.stringify({ findings: [{ id: "F-001", level: "P1", title: "示例：批量操作未定义部分失败", location: "03-订单模块.md:20（§3.1）", module: "订单模块", feature: "FP-6", flow: "批量删除的部分失败处理", problem: "设计只写了批量删除，没有定义中途失败时已处理的数据是否回滚", mechanism: "未定义部分成功语义", counterexample: "给定 5 条订单，第 3 条写库失败 → 前 2 条已写且未回滚 → 因为缺补偿", impact: "库内残留半批数据，重试又造成重复", fix: "1) §3.1 明确部分失败语义（全回滚或逐条返回） 2) 补补偿动作与幂等键 3) 补失败用例", sources: [{ batch: "b01", id: "F-001", level: "P1" }] }] }, null, 2));
 writeFileSync(join(review, "REPORT.md"), `# 示例评审报告
+评审模式：全量（工作区当前版本）
 
 发现 F-001。对抗：成立率 1.00 / 有效辩护率 0.00 / 升级率 0.00 / 未决率 0.00。
 

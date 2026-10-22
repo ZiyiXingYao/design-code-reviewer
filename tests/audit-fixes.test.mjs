@@ -19,6 +19,7 @@ function mkReview(root, id, type = "design", expected = { dimension: 15 }) {
   const dir = workDir(root, id);
   initReview(dir, {
     type, reviewId: id, root, expected, steps: ["A0"],
+    mode: type === "impl" ? "delta" : "full", from: type === "impl" ? "abc1234" : "",
     batches: [{ id: "b01", group: "s1", unit: "x", kind: "discrete" }]
   });
   updateState(dir, (s) => { s.steps.A0 = { status: "done", at: new Date().toISOString() }; });

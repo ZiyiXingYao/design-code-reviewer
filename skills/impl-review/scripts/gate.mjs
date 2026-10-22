@@ -371,6 +371,39 @@ const verdict = readJson(join(dir, "08-verdict.json"));
   }
 }
 
+// G21 评审模式声明：必须有 mode；delta 必须有区间；报告必须写明模式与区间
+{
+  const mode = state.mode;
+  const range = state.range || plan.range || {};
+  const report = read(join(dir, "REPORT.md")) || "";
+  const problems = [];
+  if (!["full", "delta"].includes(mode)) problems.push(`未声明评审模式（state.mode=${mode ?? "缺失"}）`);
+  if (mode === "delta" && !range.from) problems.push("delta 缺变更起点 from");
+  if (!report) problems.push("缺 REPORT.md");
+  else if (mode === "full" && !/评审模式[：:]\s*全量/.test(report)) problems.push("报告未声明「评审模式：全量」");
+  else if (mode === "delta") {
+    if (!/评审模式[：:]\s*增量/.test(report)) problems.push("报告未声明「评审模式：增量」");
+    if (range.from && !report.includes(range.from)) problems.push(`报告未写变更起点 ${range.from}`);
+    if (range.to && !["HEAD", "WORKTREE"].includes(range.to) && !report.includes(range.to)) problems.push(`报告未写变更终点 ${range.to}`);
+  }
+  check("G21 评审模式声明", problems.length === 0,
+    problems.join("；") || `${mode}${mode === "delta" ? ` ${range.from}..${range.to}` : ""}`);
+}
+
+// G22 范围一致性：state 与 plan 的模式/区间必须一致
+{
+  const sm = state.mode;
+  const pm = plan.mode;
+  const sr = state.range || {};
+  const pr = plan.range || {};
+  const problems = [];
+  if (sm && pm && sm !== pm) problems.push(`state.mode=${sm} 与 plan.mode=${pm} 不一致`);
+  if ((sm || pm) === "delta" && (sr.from !== pr.from || (sr.to || "HEAD") !== (pr.to || "HEAD"))) {
+    problems.push("state.range 与 plan.range 不一致");
+  }
+  check("G22 范围一致性", problems.length === 0, problems.join("；") || "mode / range 与计划一致");
+}
+
 // 汇总
 const blocking = results.filter((r) => r.blocking);
 const passed = blocking.every((r) => r.ok);

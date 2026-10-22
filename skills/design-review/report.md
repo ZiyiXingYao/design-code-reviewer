@@ -7,8 +7,11 @@
 # <项目> 设计方案评审报告
 
 - 评审日期：<YYYY-MM-DD>
-- 设计基线：<commit sha>；state=<closed|confirm|draft>；reopen <N> 次
+- 评审模式：全量（仅当前文档内容，不查提交历史）
+  <!-- 增量模式改为：评审模式：增量 <from>..<to>（只覆盖该区间，不覆盖未变更部分） -->
+- 设计状态：state=<closed|confirm|draft>；reopen <N> 次
 - 评审范围：<文档清单>，共 <N> 份 / <M> 行
+  <!-- 增量模式改为：代码变更范围 <from>..<to> → 设计变更文件 <list>；受影响章节 <list> -->
 - 约束：本报告只读，不改文档
 
 ## 0 流程执行摘要

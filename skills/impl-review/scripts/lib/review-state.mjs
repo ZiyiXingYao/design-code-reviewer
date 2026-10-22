@@ -314,6 +314,8 @@ function buildState(dir, plan, extra) {
   const state = {
     schema_version: SCHEMA_VERSION,
     review_type: plan.review_type,
+    mode: plan.mode,
+    ...(plan.range ? { range: plan.range } : {}),
     review_id: prev.review_id || basename(dir),
     root: prev.root || "",
     tier: plan.tier,
@@ -351,8 +353,14 @@ function buildState(dir, plan, extra) {
 
 export function initReview(dir, opts) {
   ensureDir(dir);
+  const mode = opts.mode || (opts.type === "impl" ? "delta" : "full");
+  if (!["full", "delta"].includes(mode)) throw new Error(`未知评审模式：${mode}`);
+  const range = mode === "delta" ? { from: opts.from || "", to: opts.to || "HEAD" } : null;
+  if (mode === "delta" && !range.from) throw new Error("增量模式必须给 --from <rev>（变更起点）");
   const plan = {
     review_type: opts.type,
+    mode,
+    ...(range ? { range } : {}),
     tier: opts.tier || "standard",
     max_concurrency: opts.maxConcurrency || 4,
     created_at: new Date().toISOString(),
@@ -376,6 +384,8 @@ export function initReview(dir, opts) {
   const state = {
     schema_version: SCHEMA_VERSION,
     review_type: opts.type,
+    mode,
+    ...(range ? { range } : {}),
     review_id: opts.reviewId || basename(dir),
     root: opts.root || "",
     tier: plan.tier,

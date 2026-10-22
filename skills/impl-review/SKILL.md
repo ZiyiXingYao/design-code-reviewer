@@ -89,7 +89,7 @@ DR-1 无实现 / DR-2 改名未回写 / DR-3 行为不符 / DR-4 残留 / DR-5 �
 
 ```
 # 先开一轮，拿到 reviewDir（<projectRoot>/.design-code-reviewer/<YYYY-MM-DD>-impl/）
-node <skill-root>/scripts/state.mjs init <projectRoot> --type impl --plan <plan.json> [--bench L2] [--id <id>]
+node <skill-root>/scripts/state.mjs init <projectRoot> --type impl --plan <plan.json> [--mode delta --from <rev> --to <rev>|--mode full] [--bench L2] [--id <id>]
 
 node <skill-root>/scripts/preflight.mjs <projectRoot> [--require-design] --out <reviewDir>
 node <skill-root>/scripts/claims.mjs <projectRoot> --out <reviewDir>/claims.json
@@ -112,6 +112,7 @@ gate 不通过不许出报告（只能标 `DRAFT`），也不许 approve。进�
 请人评审时必须报出交付目录路径、已落地文件清单，并说明 `task.md` 待批准后生成。
 
 覆盖下限：impl 标准档 20 镜头（quick 5）；低于下限时 gate 拒绝，除非显式豁免。跨次账本在 `.design-code-reviewer/ledger.yaml`。
+两种模式：`delta`（默认）审 `--from..--to` 的代码变更，并对照变更涉及的设计章节；`full` 审整仓代码、对照全部设计文档。
 G20 报告自包含：P0/P1 每条须有独立小节且含「在哪 / 什么问题 / 怎么改」，位置必须是代码 `file:line` 并给设计对照；`05-findings.json` 是证据库，不能替报告正文。
 
 中间产物在 `.design-code-reviewer/<YYYY-MM-DD>-impl/`；成品放 `specs/audit/<YYYY-MM-DD>-impl/`：`reported` 时先就位 `REPORT.md`、`SUMMARY.md`，`task.md` 由人工批准后按 P0/P1 生成，依赖排序、四段式提示词。

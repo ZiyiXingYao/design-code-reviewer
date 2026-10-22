@@ -110,14 +110,14 @@ function implPlan() {
 
 function initDesign(root, id) {
   const dir = workDir(root, id);
-  initReview(dir, { type: "design", reviewId: id, root, expected: designPlan().expected, steps: ["A0"], batches: designPlan().batches });
+  initReview(dir, { type: "design", reviewId: id, root, mode: "full", expected: designPlan().expected, steps: ["A0"], batches: designPlan().batches });
   updateState(dir, (s) => { s.state = "verifying"; s.steps.A0 = { status: "done", at: new Date().toISOString() }; });
   seedAgents(dir);
   commitBatch(dir, { payload: { batch: "b01", group: "s1", unit: "15 维度", kind: "discrete", status: "done", covers: Array.from({ length: 15 }, (_, i) => ({ kind: "dimension", id: `D${i + 1}` })), findings: [], coverage_note: "ok", cross_hints: [] } });
   commitBatch(dir, { payload: { batch: "b02", group: "a4", unit: "17 场景", kind: "discrete", status: "done", covers: ["F1","F2","F3","F4","F5","C1","C2","C3","C4","V1","V2","V3","V4","O1","O2","S1","S2"].map((id) => ({ kind: "scenario", id })), findings: [], coverage_note: "ok", cross_hints: [] } });
   commitBatch(dir, { payload: { batch: "b03", group: "a3", unit: "FP1", kind: "incremental", status: "done", covers: Array.from({ length: 20 }, (_, i) => ({ kind: "completeness", id: `FP1#${i + 1}` })), cells: Array.from({ length: 20 }, (_, i) => ({ id: `FP1#${i + 1}`, verdict: "有" })), findings: [], coverage_note: "ok", cross_hints: [] } });
   seedFindings(dir, { type: "design", level: "P1" });
-  writeFileSync(join(dir, "REPORT.md"), "# 设计评审报告\nGate D 结论：不通过\n\n发现 F-001。\n对抗：成立率 1.00 / 有效辩护率 0.00 / 升级率 0.00 / 未决率 0.00\n\n## 7 发现清单\n\n### F-001 示例缺陷\n\n- **在哪**：`03-订单模块.md:20`（§3.1）\n  - 模块：订单模块｜功能点：FP-1｜流程：示例流程\n- **什么问题**：缺少校验\n- **会怎样**：给定非法输入 → 越界 → 因为没有校验\n- **怎么改**：第一步补校验；第二步加回归用例\n\n## 交接块\n- C-1 主实体可跨分区 → 状态键按分区聚合\n");
+  writeFileSync(join(dir, "REPORT.md"), "# 设计评审报告\n评审模式：全量（工作区当前版本）\nGate D 结论：不通过\n\n发现 F-001。\n对抗：成立率 1.00 / 有效辩护率 0.00 / 升级率 0.00 / 未决率 0.00\n\n## 7 发现清单\n\n### F-001 示例缺陷\n\n- **在哪**：`03-订单模块.md:20`（§3.1）\n  - 模块：订单模块｜功能点：FP-1｜流程：示例流程\n- **什么问题**：缺少校验\n- **会怎样**：给定非法输入 → 越界 → 因为没有校验\n- **怎么改**：第一步补校验；第二步加回归用例\n\n## 交接块\n- C-1 主实体可跨分区 → 状态键按分区聚合\n");
   writeFileSync(join(dir, "SUMMARY.md"), summaryMd("不通过"));
   // 进 reported 即交付成品，人工评审看到的就是交付目录里的文件
   const t = run("skills/design-review/scripts/state.mjs", ["transition", dir, "reported", "--reason", "A7 完成"]);
@@ -127,13 +127,13 @@ function initDesign(root, id) {
 
 function initImpl(root, id) {
   const dir = workDir(root, id);
-  initReview(dir, { type: "impl", reviewId: id, root, expected: implPlan().expected, steps: ["B0"], batches: implPlan().batches });
+  initReview(dir, { type: "impl", reviewId: id, root, mode: "delta", from: "abc1234", to: "def5678", expected: implPlan().expected, steps: ["B0"], batches: implPlan().batches });
   updateState(dir, (s) => { s.state = "verifying"; s.steps.B0 = { status: "done", at: new Date().toISOString() }; });
   seedAgents(dir);
   commitBatch(dir, { payload: { batch: "b01", group: "s3", unit: "20 镜头", kind: "discrete", status: "done", covers: Array.from({ length: 20 }, (_, i) => ({ kind: "lens", id: String(i + 1) })), findings: [], coverage_note: "ok", cross_hints: [] } });
   seedFindings(dir, { type: "impl", level: "P1" });
   J(join(dir, "preflight.json"), { failures: [] });
-  writeFileSync(join(dir, "REPORT.md"), "# 实现评审报告\n基准：L1\nGate I 结论：有条件通过\n\n发现 F-001。\n对抗：成立率 1.00 / 有效辩护率 0.00 / 升级率 0.00 / 未决率 0.00\n\n## 7 发现清单\n\n### F-001 示例缺陷\n\n- **在哪**：`src/order/order_service.cpp:10`（OrderService::Create）＋ 设计对照 `03-订单模块.md:20`（§3.1）\n  - 模块：订单｜镜头：04 错误处理｜流程：示例流程\n- **什么问题**：缺少校验\n- **会怎样**：给定非法输入 → 越界 → 因为没有校验\n- **怎么改**：第一步补校验；第二步加回归用例\n");
+  writeFileSync(join(dir, "REPORT.md"), "# 实现评审报告\n评审模式：增量 abc1234..def5678\n基准：L1\nGate I 结论：有条件通过\n\n发现 F-001。\n对抗：成立率 1.00 / 有效辩护率 0.00 / 升级率 0.00 / 未决率 0.00\n\n## 7 发现清单\n\n### F-001 示例缺陷\n\n- **在哪**：`src/order/order_service.cpp:10`（OrderService::Create）＋ 设计对照 `03-订单模块.md:20`（§3.1）\n  - 模块：订单｜镜头：04 错误处理｜流程：示例流程\n- **什么问题**：缺少校验\n- **会怎样**：给定非法输入 → 越界 → 因为没有校验\n- **怎么改**：第一步补校验；第二步加回归用例\n");
   writeFileSync(join(dir, "SUMMARY.md"), summaryMd("有条件通过", "L1"));
   const t = run("skills/impl-review/scripts/state.mjs", ["transition", dir, "reported", "--reason", "B9 完成"]);
   if (t.status !== 0) throw new Error("transition reported 失败：" + t.stderr);
@@ -311,7 +311,7 @@ ok("覆盖不足：G16 拒绝", () => {
 ok("L0 写「符合设计」：G7 拒绝", () => {
   const root = mk("dcr-dry-l0-");
   const dir = workDir(root, "2026-01-01-impl");
-  initReview(dir, { type: "impl", reviewId: "2026-01-01-impl", root, expected: { lens: 20 }, steps: ["B0"], batches: [{ id: "b01", group: "s3", unit: "L", kind: "discrete" }], bench: "L0" });
+  initReview(dir, { type: "impl", reviewId: "2026-01-01-impl", root, mode: "delta", from: "abc1234", expected: { lens: 20 }, steps: ["B0"], batches: [{ id: "b01", group: "s3", unit: "L", kind: "discrete" }], bench: "L0" });
   updateState(dir, (s) => { s.state = "reported"; s.steps.B0 = { status: "done", at: new Date().toISOString() }; });
   writeFileSync(join(dir, "REPORT.md"), "基准：L0\n实现符合设计。\n");
   writeFileSync(join(dir, "SUMMARY.md"), summaryMd("通过", "L0"));

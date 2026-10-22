@@ -84,7 +84,7 @@ node <skill-root>/scripts/docstat.mjs <projectRoot> [--json]
 
 ```
 # 开一轮（自动生成 id：<YYYY-MM-DD>-design；同日同类型自动 -2）
-node <skill-root>/scripts/state.mjs init <projectRoot> --type design --plan <plan.json> [--id <id>]
+node <skill-root>/scripts/state.mjs init <projectRoot> --type design --plan <plan.json> [--mode full|delta --from <rev> --to <rev>] [--id <id>]
 
 # 落盘与进度
 node <skill-root>/scripts/state.mjs batch <reviewDir> --payload <b01.json> --agent sub-a01 --ms 142000
@@ -116,6 +116,7 @@ node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 - `approve` 才生成 `task.md`，三件一起复核交付（覆盖旧稿）并置 `closed`；同时自动更新跨次账本 `ledger.yaml`。
 - gate 的覆盖下限：design 标准档 15 维/17 卡/20 格（格数须为 20 的倍数）；确需更小范围用 `plan.coverage_floor_exempt` 或 `gate --allow-partial-coverage`。
 - **G20 报告自包含**：P0/P1 每条须有独立小节且含「在哪 / 什么问题 / 怎么改」，位置禁止 `05:338` 式缩写；P0/P1 不许只给压缩表格。`05-findings.json` 是证据库，不能替报告正文。
+- **两种模式**：`full`（默认）审 `specs/design/` 当前全部内容，**不查提交历史**、报告不写基线 commit；`delta` 必须给 `--from/--to`，只审该区间的设计变更及其引用/被引用章节，报告须声明"只覆盖该区间"。
 - **人工评审是独立一步**：报告写完停 `reported`，等待用户确认；批准人必须显式传给 `--reviewer`。
 - **请人评审时必须报清交付状态**：给出交付目录路径、已落地文件清单，并说明 `task.md` 待批准后生成。不许只说"报告写好了"——评审者会打开 `specs/audit/<id>/`，那里必须有东西。
 
