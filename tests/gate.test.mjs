@@ -172,3 +172,14 @@ test("位置写成 05:338 缩写：G20 拒绝", () => {
   assert.equal(g20.ok, false);
   assert.match(g20.detail, /缩写/);
 });
+
+test("性能小节缺「平衡结论」：G24 拒绝", () => {
+  const dir = build(tmpReviewDir());
+  const rp = join(dir, "REPORT.md");
+  writeFileSync(rp, readFileSync(rp, "utf8").replace("- **平衡结论**：示例：无额外复杂度\n", ""));
+  const r = runGate(dir);
+  assert.equal(r.code, 1);
+  const g24 = r.out.results.find((x) => x.id.startsWith("G24"));
+  assert.equal(g24.ok, false);
+  assert.match(g24.detail, /平衡结论/);
+});

@@ -115,6 +115,7 @@ gate 不通过不许出报告（只能标 `DRAFT`），也不许 approve。进�
 覆盖下限：impl 标准档 20 镜头（quick 5）；低于下限时 gate 拒绝，除非显式豁免。跨次账本在 `.design-code-reviewer/ledger.yaml`。
 两种模式：`delta`（默认）审 `--from..--to` 的代码变更，并对照变更涉及的设计章节；`full` 审整仓代码、对照全部设计文档。
 G20 报告自包含：P0/P1 每条须有独立小节且含「在哪 / 什么问题 / 怎么改」，位置必须是代码 `file:line` 并给设计对照；`05-findings.json` 是证据库，不能替报告正文。
+G24 性能与平衡：报告必须有「性能与容量」小节（性能结论 / 容量与上限 / 时延与热点 / 平衡结论）。镜头 16 的性能发现必须带量级或复杂度，优化建议必须写代价；**无量化依据的优化不算缺陷（最多 P3 提示）**，不得为性能牺牲可读性或引入无必要的并发/池化。
 
 中间产物在 `.design-code-reviewer/<YYYY-MM-DD>-impl/`；成品放 `specs/audit/<YYYY-MM-DD>-impl/`：`reported` 时先就位 `REPORT.md`、`SUMMARY.md`，`task.md` 由人工批准后按 P0/P1 生成，依赖排序、四段式提示词。
 

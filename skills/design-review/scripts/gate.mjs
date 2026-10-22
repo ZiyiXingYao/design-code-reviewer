@@ -433,6 +433,27 @@ const verdict = readJson(join(dir, "08-verdict.json"));
   }
 }
 
+// G24 性能与平衡：标准/深度档必须有性能小节，且四项齐全
+{
+  const quick = (plan.tier || "standard") === "quick";
+  const report = read(join(dir, "REPORT.md")) || "";
+  if (quick) {
+    check("G24 性能与平衡", true, "quick 档跳过", false);
+  } else if (!report) {
+    check("G24 性能与平衡", false, "缺 REPORT.md");
+  } else {
+    const m = report.match(/^#{2,3}\s+性能与容量[^\n]*\n([\s\S]*?)(?=^#{2,3}\s|(?![\s\S]))/m);
+    const problems = [];
+    if (!m) problems.push("缺「性能与容量」小节");
+    else {
+      for (const k of ["性能结论", "容量与上限", "时延与热点", "平衡结论"]) {
+        if (!m[1].includes(`**${k}**`)) problems.push(`缺「${k}」`);
+      }
+    }
+    check("G24 性能与平衡", problems.length === 0, problems.join("；") || "性能与平衡四项齐全");
+  }
+}
+
 // 汇总
 const blocking = results.filter((r) => r.blocking);
 const passed = blocking.every((r) => r.ok);

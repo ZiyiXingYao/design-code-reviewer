@@ -117,6 +117,7 @@ node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 - `approve` 才生成 `task.md`，三件一起复核交付（覆盖旧稿）并置 `closed`；同时自动更新跨次账本 `ledger.yaml`。
 - gate 的覆盖下限：design 标准档 15 维/17 卡/20 格（格数须为 20 的倍数）；确需更小范围用 `plan.coverage_floor_exempt` 或 `gate --allow-partial-coverage`。
 - **G20 报告自包含**：P0/P1 每条须有独立小节且含「在哪 / 什么问题 / 怎么改」，位置禁止 `05:338` 式缩写；P0/P1 不许只给压缩表格。`05-findings.json` 是证据库，不能替报告正文。
+- **G24 性能与平衡**：报告必须有「性能与容量」小节，四项齐全（性能结论 / 容量与上限 / 时延与热点 / 平衡结论）。性能结论要给推导式与数字；**优化建议必须同时给可读性与实现代价**，无量化依据的复杂化按过度设计记 P2，不得作为 P0/P1。
 - **两种模式**：`full`（默认）审 `specs/design/` 当前全部内容，**不查提交历史**、报告不写基线 commit；`delta` 必须给 `--from/--to`，只审该区间的设计变更及其引用/被引用章节，报告须声明"只覆盖该区间"。
 - **delta 流程**：`init --mode delta --from A --to B` → `scope.mjs` 产出 `scope.json` → `plan.json` 写 `scope_file: "scope.json"` 与受影响面 `expected` → 只批受影响维度/场景/漏项 → 报告列出全部变更文件与「未覆盖声明」。
 - **人工评审是独立一步**：报告写完停 `reported`，等待用户确认；批准人必须显式传给 `--reviewer`。
