@@ -55,7 +55,17 @@ export function writeVerdicts(dir, { accusations, defenses, verdicts, stats }) {
   writeFileSync(join(dir, "08-verdict.json"), JSON.stringify({ verdicts, stats }, null, 2));
 }
 
-export function writeReports(dir, { bench = "L2", extra = "" } = {}) {
+export function writeReports(dir, { bench = "L2", extra = "", findings = [] } = {}) {
+  const blocks = findings
+    .filter((f) => ["P0", "P1"].includes(f.level))
+    .map((f) => `### ${f.id} ${f.title}
+
+- **在哪**：\`${f.location}\`（§3.1）
+  - 模块：示例模块｜功能点：FP-1｜流程：示例流程
+- **什么问题**：${f.mechanism || "缺机制"}
+- **会怎样**：${f.counterexample || "给定X→Y→缺Z"}
+- **怎么改**：${f.suggestion || "补机制"}
+`).join("\n");
   writeFileSync(join(dir, "REPORT.md"), `# 评审报告
 基准：${bench}
 
@@ -63,6 +73,9 @@ export function writeReports(dir, { bench = "L2", extra = "" } = {}) {
 发现 F-001。
 - 对抗：指控 1，成立 1，驳回 0，未决 0（成立率 1.0 / 有效辩护率 0.5 / 升级率 0.0 / 未决率 0.0）
 ${extra}
+## 7 发现清单
+
+${blocks}
 ## 交接块
 
 - 设计基线：abc1234

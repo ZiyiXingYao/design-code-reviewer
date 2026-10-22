@@ -346,6 +346,31 @@ const verdict = readJson(join(dir, "08-verdict.json"));
   }
 }
 
+// G20 报告自包含：P0/P1 每条四段齐全，位置不许缩写
+{
+  const report = read(join(dir, "REPORT.md"));
+  const must = findings.filter((f) => ["P0", "P1"].includes(f.level));
+  const problems = [];
+  if (!must.length) {
+    check("G20 报告自包含", true, "无 P0/P1，跳过", false);
+  } else if (!report) {
+    check("G20 报告自包含", false, "缺 REPORT.md");
+  } else {
+    for (const f of must) {
+      const re = new RegExp(`^#{3,4}\\s+${f.id}\\b[\\s\\S]*?(?=^#{2,4}\\s|(?![\\s\\S]))`, "m");
+      const m = report.match(re);
+      if (!m) { problems.push(`${f.id}(${f.level}) 无独立小节`); continue; }
+      const block = m[0];
+      for (const k of ["在哪", "什么问题", "怎么改"]) {
+        if (!block.includes(`**${k}**`)) problems.push(`${f.id} 缺「${k}」`);
+      }
+      const loc = (block.match(/\*\*在哪\*\*[^\n]*/) || [""])[0];
+      if (/\b\d{2}:\d{2,}\b/.test(loc)) problems.push(`${f.id} 位置写成缩写（如 05:338），须写完整文件名`);
+    }
+    check("G20 报告自包含", problems.length === 0, problems.slice(0, 10).join("；") || `${must.length} 条 P0/P1 四段齐全`);
+  }
+}
+
 // 汇总
 const blocking = results.filter((r) => r.blocking);
 const passed = blocking.every((r) => r.ok);

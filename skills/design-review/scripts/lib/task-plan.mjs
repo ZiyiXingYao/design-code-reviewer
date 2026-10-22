@@ -10,11 +10,35 @@
 
 const LEVEL_ORDER = { P0: 0, P1: 1, P2: 2, P3: 3 };
 const FILE_RE = /([^\s;；,，()（）]+\.(?:md|h|hpp|c|cc|cpp|mjs|js|ts|json|ya?ml|sql|proto))/;
-const BRIEF_MAX = 360;
+const PATH_PREFIX = /^(specs\/|\/|src\/|apps\/|plugins_src\/|test\/)/;
+const LOC_SEP = /[；;]+/;
 
-function brief(s) {
-  const first = String(s || "").split(/；/)[0].trim();
-  return first.length > BRIEF_MAX ? first.slice(0, BRIEF_MAX) + "…" : first;
+/** 原文保留：只压平换行，不按分号截断（分号后往往正是第 2/3 步改法） */
+function full(s) {
+  return String(s ?? "").replace(/\s*\n\s*/g, " ").trim();
+}
+
+/** 位置串拆成逐条，便于列出「参考文件」 */
+function locationEntries(location) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of String(location || "").split(LOC_SEP)) {
+    const s = raw.trim();
+    if (!s || seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
+}
+
+/** 设计评审的位置补全为可打开的相对路径 */
+function targetPath(entry, design) {
+  if (!design || PATH_PREFIX.test(entry)) return entry;
+  return `specs/design/${entry}`;
+}
+
+function findingFix(f) {
+  return full(f.fix || f.suggestion || f.mechanism) || "按发现描述修复";
 }
 
 export function finalLevels(findings, verdicts, accusations) {
@@ -45,30 +69,37 @@ function moduleOf(f) {
 
 function isDesign(reviewType) { return reviewType !== "impl"; }
 
-function promptFor(f, reviewType) {
+function promptFor(f, reviewType, refs, evidencePath) {
   const design = isDesign(reviewType);
   const target = design ? "设计文档" : "代码";
   const verify = design
-    ? `反例不再成立：${brief(f.counterexample) || "（原反例缺失）"}；对应维度/场景复查通过；重跑 gate`
-    : `触发条件不再复现：${brief(f.trigger || f.counterexample) || "（原触发条件缺失）"}；相关测试与复跑通过`;
+    ? `反例不再成立：${full(f.counterexample) || "（原反例缺失）"}；对应维度/场景复查通过；重跑 gate`
+    : `触发条件不再复现：${full(f.trigger || f.counterexample) || "（原触发条件缺失）"}；相关测试与复跑通过`;
   return [
     `    - [实现的功能] 修复 ${f.id}：${f.title}`,
-    `    - [任务实现的要求] 修改 ${target} ${brief(f.location)}：${brief(f.suggestion || f.mechanism)}；消除机制「${brief(f.mechanism)}」`,
-    `    - [实现的约束] 只改「涉及」列出的位置；不得改动其他任务的文件；不得改变设计/契约已定的其他行为`,
+    `    - [任务实现的要求] 修改 ${target} ${refs.join("；")}：${findingFix(f)}；消除机制「${full(f.mechanism)}」`,
+    `    - [证据] ${evidencePath} → ${f.id}（机制 / 反例 / 影响原文）`,
+    `    - [实现的约束] 只改「参考文件」列出的位置；不得改动其他任务的文件；不得改变设计/契约已定的其他行为`,
     `    - [验收标准] ${verify}`
   ].join("\n");
 }
 
-function taskBlock(t, reviewType) {
+function taskBlock(t, reviewType, evidencePath) {
   const deps = t.dependsOn.length ? t.dependsOn.join("、") : "无";
+  const design = isDesign(reviewType);
+  const refs = t.locations.map((l) => (design ? targetPath(l, true) : l));
+  const impact = full(t.finding.impact) || "（原发现未写影响）";
   return [
     `- [ ] **${t.id} [${t.level}] ${t.finding.title}**（${t.finding.id}）`,
-    `  - 问题：${brief(t.finding.mechanism)}`,
-    `  - 怎么改：${brief(t.finding.suggestion) || "按发现描述修复"}`,
-    `  - 涉及：${brief(t.finding.location)}`,
+    `  - 问题：${full(t.finding.problem || t.finding.mechanism)}`,
+    `  - 影响：${impact}`,
+    `  - 怎么改：${findingFix(t.finding)}`,
+    `  - 参考文件（均需修改）：`,
+    ...refs.map((l) => `    - ${l}`),
+    `  - 证据：${evidencePath} → ${t.finding.id}`,
     `  - 依赖：${deps}`,
     "  - AI 提示词：",
-    promptFor(t.finding, reviewType)
+    promptFor(t.finding, reviewType, refs, evidencePath)
   ].join("\n");
 }
 
@@ -112,9 +143,10 @@ function topo(tasks, errors) {
  */
 export function generateTaskMd({
   reviewId, reviewType, reviewer, at, conclusion,
-  findings, verdicts, accusations, includeP2 = false, existing = ""
+  findings, verdicts, accusations, includeP2 = false, existing = "", evidencePath = ""
 }) {
   const errors = [];
+  const evidence = evidencePath || `.design-code-reviewer/${reviewId}/05-findings.json`;
   const scored = finalLevels(findings, verdicts, accusations)
     .filter((f) => ["P0", "P1", "P2"].includes(f.finalLevel))
     .filter((f) => includeP2 || f.finalLevel !== "P2");
@@ -130,6 +162,7 @@ export function generateTaskMd({
     level: f.finalLevel,
     module: moduleOf(f),
     file: primaryFile(f.location),
+    locations: locationEntries(f.location),
     shared: (f.sources || []).length >= 2,
     dependsOnFindings: Array.isArray(f.depends_on) ? f.depends_on : [],
     dependsOn: []
@@ -164,7 +197,7 @@ export function generateTaskMd({
       .filter(Boolean);
   }
 
-  const body = ordered.map((t) => taskBlock(t, reviewType)).join("\n\n");
+  const body = ordered.map((t) => taskBlock(t, reviewType, evidence)).join("\n\n");
   const depLines = [];
   depLines.push("- 环检测：无");
   const sameFile = [...groups.entries()].filter(([, l]) => l.length > 1);
@@ -190,6 +223,8 @@ export function generateTaskMd({
 - 评审类型：${reviewType}
 - 批准人：${reviewer}（${at}）
 - 说明：复选框勾上表示已完成；本文件是实现方交接物，不要删除未完成任务
+- 证据库：${evidence}（机器可读；本文件已内联每条任务所需的机制/反例/影响原文）
+- 路径约定：${isDesign(reviewType) ? "设计文档路径相对 <projectRoot>/specs/design/" : "代码路径相对仓库根"}
 
 ## 任务
 

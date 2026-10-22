@@ -75,3 +75,18 @@ test("已有任务全部勾选：整份重写", () => {
   assert.doesNotMatch(out.markdown, /F-009/);
   assert.match(out.markdown, /T-01 \[P1\] 缺陷 F-002/);
 });
+
+test("task.md 保留完整改法与影响，给完整路径与证据位置", () => {
+  const x = f("F-001", "P0");
+  x.suggestion = "第一步收敛出口；第二步让扫描返回待收尾；第三步删掉转移环";
+  x.location = "05-设备域.md:338（§3.8）；01-架构设计.md:775（§12.2）";
+  x.impact = "对象与订阅泄漏随正常下线数线性增长";
+  const out = gen([x]);
+  assert.equal(out.ok, true, out.errors.join("；"));
+  assert.match(out.markdown, /第二步让扫描返回待收尾/, "分号后的改法被截断");
+  assert.match(out.markdown, /第三步删掉转移环/);
+  assert.match(out.markdown, /影响：对象与订阅泄漏随正常下线数线性增长/);
+  assert.match(out.markdown, /specs\/design\/05-设备域\.md:338/);
+  assert.match(out.markdown, /specs\/design\/01-架构设计\.md:775/);
+  assert.match(out.markdown, /05-findings\.json → F-001/);
+});

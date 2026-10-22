@@ -54,7 +54,7 @@ node <skill-root>/scripts/docstat.mjs <projectRoot> [--json]
 | **A5a 红队** | 按弹药库对全部 P0/P1 候选发指控 | `06-accusations.json` | 每条含位置+机制+后果；有 coverage_note |
 | **A5b 蓝队** | 逐条辩护或承认 | `07-defense.json` | 每条有结论；无效辩护视为承认 |
 | **A5c 裁判** | 三态裁断，禁止折中 | `08-verdict.json` | 只有 upheld/dismissed/unresolved |
-| **A6 定级成文** | 按裁断定级 → `REPORT.md`（11 节 + 交接块） | 报告 | gate 通过 |
+| **A6 定级成文** | 按裁断定级 → `REPORT.md`（11 节 + 交接块；§7 的 P0/P1 逐条四段式） | 报告 | gate G20 通过 |
 | **A7 收口 + 交付** | `SUMMARY.md` + gate，再把 REPORT/SUMMARY 交付到 `specs/audit/<id>/` | 2 页说明书 + 交付目录 2 件 | gate 通过；交付目录 2 件与工作副本一致 |
 | **A8 人工评审 + task.md** | 把**已交付的成品**交人评审；批准后生成修复任务清单并关闭 | `task.md` | `approve` 成功，状态 `closed` |
 
@@ -115,6 +115,7 @@ node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 - 报告在评审中被修订后必须 `deliver` 重新交付；交付目录与工作副本不一致时 gate G14 拦截。
 - `approve` 才生成 `task.md`，三件一起复核交付（覆盖旧稿）并置 `closed`；同时自动更新跨次账本 `ledger.yaml`。
 - gate 的覆盖下限：design 标准档 15 维/17 卡/20 格（格数须为 20 的倍数）；确需更小范围用 `plan.coverage_floor_exempt` 或 `gate --allow-partial-coverage`。
+- **G20 报告自包含**：P0/P1 每条须有独立小节且含「在哪 / 什么问题 / 怎么改」，位置禁止 `05:338` 式缩写；P0/P1 不许只给压缩表格。`05-findings.json` 是证据库，不能替报告正文。
 - **人工评审是独立一步**：报告写完停 `reported`，等待用户确认；批准人必须显式传给 `--reviewer`。
 - **请人评审时必须报清交付状态**：给出交付目录路径、已落地文件清单，并说明 `task.md` 待批准后生成。不许只说"报告写好了"——评审者会打开 `specs/audit/<id>/`，那里必须有东西。
 

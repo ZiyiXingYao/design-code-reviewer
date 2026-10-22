@@ -65,7 +65,7 @@ function seedFindings(dir, { type = "design", level = "P1" } = {}) {
   const f = {
     id: "F-001", level, title: "示例缺陷", location: type === "design" ? "03-订单模块.md:20" : "src/order/order_service.cpp:10",
     mechanism: "缺少校验", counterexample: "给定非法输入 → 越界 → 因为没有校验",
-    trigger: "非法输入", suggestion: "补校验", depends_on: [],
+    trigger: "非法输入", suggestion: "第一步补校验；第二步加回归用例", depends_on: [],
     sources: [{ batch: "b01", id: "F-001", level }]
   };
   J(join(dir, "05-findings.json"), { findings: [f] });
@@ -116,7 +116,7 @@ function initDesign(root, id) {
   commitBatch(dir, { payload: { batch: "b02", group: "a4", unit: "17 场景", kind: "discrete", status: "done", covers: ["F1","F2","F3","F4","F5","C1","C2","C3","C4","V1","V2","V3","V4","O1","O2","S1","S2"].map((id) => ({ kind: "scenario", id })), findings: [], coverage_note: "ok", cross_hints: [] } });
   commitBatch(dir, { payload: { batch: "b03", group: "a3", unit: "FP1", kind: "incremental", status: "done", covers: Array.from({ length: 20 }, (_, i) => ({ kind: "completeness", id: `FP1#${i + 1}` })), cells: Array.from({ length: 20 }, (_, i) => ({ id: `FP1#${i + 1}`, verdict: "有" })), findings: [], coverage_note: "ok", cross_hints: [] } });
   seedFindings(dir, { type: "design", level: "P1" });
-  writeFileSync(join(dir, "REPORT.md"), "# 设计评审报告\nGate D 结论：不通过\n\n发现 F-001。\n对抗：成立率 1.00 / 有效辩护率 0.00 / 升级率 0.00 / 未决率 0.00\n\n## 交接块\n- C-1 主实体可跨分区 → 状态键按分区聚合\n");
+  writeFileSync(join(dir, "REPORT.md"), "# 设计评审报告\nGate D 结论：不通过\n\n发现 F-001。\n对抗：成立率 1.00 / 有效辩护率 0.00 / 升级率 0.00 / 未决率 0.00\n\n## 7 发现清单\n\n### F-001 示例缺陷\n\n- **在哪**：`03-订单模块.md:20`（§3.1）\n  - 模块：订单模块｜功能点：FP-1｜流程：示例流程\n- **什么问题**：缺少校验\n- **会怎样**：给定非法输入 → 越界 → 因为没有校验\n- **怎么改**：第一步补校验；第二步加回归用例\n\n## 交接块\n- C-1 主实体可跨分区 → 状态键按分区聚合\n");
   writeFileSync(join(dir, "SUMMARY.md"), summaryMd("不通过"));
   // 进 reported 即交付成品，人工评审看到的就是交付目录里的文件
   const t = run("skills/design-review/scripts/state.mjs", ["transition", dir, "reported", "--reason", "A7 完成"]);
@@ -189,6 +189,10 @@ ok("design: approve 生成 task.md / 08-verdict.md / ledger", () => {
   const r = run("skills/design-review/scripts/state.mjs", ["approve", designDir, "--reviewer", "dry-run"]);
   eq(r.status, 0, r.stderr);
   for (const f of ["task.md", "08-verdict.md"]) truthy(existsSync(join(designDir, f)), `缺 ${f}`);
+  const tmd = readFileSync(join(designDir, "task.md"), "utf8");
+  truthy(tmd.includes("第二步加回归用例"), "task.md 把分号后的改法截断了");
+  truthy(tmd.includes("specs/design/03-订单模块.md:20"), "task.md 缺完整参考文件路径");
+  truthy(tmd.includes("05-findings.json → F-001"), "task.md 缺证据位置");
   const ledger = join(designDir.split("/.design-code-reviewer/")[0], ".design-code-reviewer/ledger.yaml");
   truthy(existsSync(ledger), "缺 ledger.yaml");
 });
@@ -339,6 +343,12 @@ ok("P0 写「通过」：G18 拒绝", () => {
   seedFindings(dir, { type: "design", level: "P0" });
   writeFileSync(join(dir, "REPORT.md"), "# r\nGate D 结论：通过\n");
   eq(gateCheck(dir, "G18").ok, false, "未拒绝");
+});
+ok("旧式压缩报告（05:338 + 无四段）：G20 拒绝", () => {
+  const root = mk("dcr-dry-g20-");
+  const dir = initDesign(root, "2026-01-01-design");
+  writeFileSync(join(dir, "REPORT.md"), "# 报告\nGate D 结论：不通过\n\n## 7 发现清单\n\n| F-001 | D8 | 05:338 | 丢帧 | 补重放 |\n");
+  eq(gateCheck(dir, "G20").ok, false, "未拒绝");
 });
 
 // ---------- 汇总 ----------

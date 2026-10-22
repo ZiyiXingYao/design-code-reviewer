@@ -34,7 +34,7 @@ function build(dir, opts = {}) {
     verdicts: [{ accusation_id: "A-001", decision: opts.decision ?? "upheld", level: opts.level ?? "P0", reason: opts.reason ?? "机制成立" }],
     stats: { accusations: 1, upheld: 1, dismissed: 0, unresolved: 0, valid_defense: 0, defended: 1 }
   });
-  writeReports(dir, { bench: opts.bench ?? "L2", extra: opts.extra ?? "" });
+  writeReports(dir, { bench: opts.bench ?? "L2", extra: opts.extra ?? "", findings: opts.findings ?? [finding()] });
   return dir;
 }
 
@@ -149,4 +149,26 @@ test("closed 但交付目录是旧稿：G14 拒绝", () => {
   const g14 = r.out.results.find((x) => x.id.startsWith("G14"));
   assert.equal(g14.ok, false);
   assert.match(g14.detail, /REPORT.md 与工作目录不一致/);
+});
+
+test("报告缺「怎么改」：G20 拒绝", () => {
+  const dir = build(tmpReviewDir());
+  const rp = join(dir, "REPORT.md");
+  writeFileSync(rp, readFileSync(rp, "utf8").replace("- **怎么改**：补机制\n", ""));
+  const r = runGate(dir);
+  assert.equal(r.code, 1);
+  const g20 = r.out.results.find((x) => x.id.startsWith("G20"));
+  assert.equal(g20.ok, false);
+  assert.match(g20.detail, /怎么改/);
+});
+
+test("位置写成 05:338 缩写：G20 拒绝", () => {
+  const dir = build(tmpReviewDir());
+  const rp = join(dir, "REPORT.md");
+  writeFileSync(rp, readFileSync(rp, "utf8").replace(/\*\*在哪\*\*：\`[^\`]*\`/, "**在哪**：\`05:338\`"));
+  const r = runGate(dir);
+  assert.equal(r.code, 1);
+  const g20 = r.out.results.find((x) => x.id.startsWith("G20"));
+  assert.equal(g20.ok, false);
+  assert.match(g20.detail, /缩写/);
 });
