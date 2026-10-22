@@ -26,14 +26,12 @@ function mkReview(root, id, type = "design", expected = { dimension: 15 }) {
 }
 const J = (p, o) => writeFileSync(p, JSON.stringify(o, null, 2));
 
-test("两份 gate 检查项一致（G20 为设计侧专有）", () => {
+test("两份 gate 检查项一致（G1–G20）", () => {
   const ids = (p) => [...readFileSync(p, "utf8").matchAll(/check\("(G[0-9]+[a-z]?)/g)].map((m) => m[1]).sort();
   const a = ids("/code/design-code-reviewer/skills/design-review/scripts/gate.mjs");
   const b = ids("/code/design-code-reviewer/skills/impl-review/scripts/gate.mjs");
-  // G20 = 报告自包含；impl 报告模板用「现象/证据/修法」字段，暂不套用同一标签
-  assert.deepEqual(a.filter((x) => x !== "G20"), b.filter((x) => x !== "G20"));
-  assert.ok(a.includes("G20") && !b.includes("G20"));
-  assert.ok(a.includes("G15") && a.includes("G16") && a.includes("G17"));
+  assert.deepEqual(a, b);
+  assert.ok(a.includes("G15") && a.includes("G16") && a.includes("G17") && a.includes("G20"));
 });
 
 test("stats：defended 与 valid_defense_rate、升级率用首轮分母", () => {

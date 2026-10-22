@@ -36,7 +36,7 @@ description: 评审代码实现是否兑现了 brainstorming-archify 的设计�
 | **B6 承诺核验** | task.md 四段 + 负向约束 diff | 承诺核对表 | 每条 `[x]` 有结论 |
 | **B6.5 去重合并** | 同位置同机制合并；同机制跨位置归并 | 唯一发现集 | 必须在对抗之前 |
 | **B7a/b/c 红-蓝-裁** | 子代理执行 | 06/07/08.json | 无折中结论 |
-| **B8 定级成文** | 11 节报告 | `REPORT.md` | gate 通过 |
+| **B8 定级成文** | 11 节报告；§7 的 P0/P1 逐条四段式 | `REPORT.md` | gate G20 通过 |
 | **B9 收口 + 交付** | `SUMMARY.md` + gate，再把 REPORT/SUMMARY 交付到 `specs/audit/<id>/` | 2 页说明书 + 交付目录 2 件 | gate 通过；交付目录 2 件与工作副本一致 |
 | **B10 人工评审 + task.md** | 把**已交付的成品**交人评审；批准后生成修复任务清单并关闭 | `task.md` | `approve` 成功，状态 `closed` |
 
@@ -112,6 +112,7 @@ gate 不通过不许出报告（只能标 `DRAFT`），也不许 approve。进�
 请人评审时必须报出交付目录路径、已落地文件清单，并说明 `task.md` 待批准后生成。
 
 覆盖下限：impl 标准档 20 镜头（quick 5）；低于下限时 gate 拒绝，除非显式豁免。跨次账本在 `.design-code-reviewer/ledger.yaml`。
+G20 报告自包含：P0/P1 每条须有独立小节且含「在哪 / 什么问题 / 怎么改」，位置必须是代码 `file:line` 并给设计对照；`05-findings.json` 是证据库，不能替报告正文。
 
 中间产物在 `.design-code-reviewer/<YYYY-MM-DD>-impl/`；成品放 `specs/audit/<YYYY-MM-DD>-impl/`：`reported` 时先就位 `REPORT.md`、`SUMMARY.md`，`task.md` 由人工批准后按 P0/P1 生成，依赖排序、四段式提示词。
 

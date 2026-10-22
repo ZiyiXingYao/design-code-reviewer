@@ -90,3 +90,29 @@ test("task.md 保留完整改法与影响，给完整路径与证据位置", () 
   assert.match(out.markdown, /specs\/design\/01-架构设计\.md:775/);
   assert.match(out.markdown, /05-findings\.json → F-001/);
 });
+
+test("impl task.md：设计对照、违反不变量、不截断", async () => {
+  const { generateTaskMd: genImpl } = await import("../skills/impl-review/scripts/lib/task-plan.mjs");
+  const x = {
+    id: "F-001", level: "P0", title: "加载失败后继续启动",
+    location: "src/plugin/runtime.cpp:430",
+    doc_ref: "04-插件运行时.md:88（§3.2）",
+    module: "插件运行时", problem: "加载失败只记 WARN 并继续启动",
+    mechanism: "错误被吞掉", invariant: "加载失败必须 fail-closed",
+    impact: "插件运行时半初始化", trigger: "符号缺失",
+    suggestion: "第一步返回错误；第二步逆序卸载已启动插件",
+    sources: [{ batch: "b01", id: "F-001", level: "P0" }]
+  };
+  const accusations = [{ id: "A-001", source_findings: ["F-001"], location: x.location, mechanism: "m", consequence: "c" }];
+  const verdicts = [{ accusation_id: "A-001", decision: "upheld", level: "P0", reason: "r" }];
+  const out = genImpl({
+    reviewId: "2026-01-01-impl", reviewType: "impl", reviewer: "测试", at: "2026-01-01T00:00:00Z",
+    conclusion: "不通过", findings: [x], verdicts, accusations
+  });
+  assert.equal(out.ok, true, out.errors.join("；"));
+  assert.match(out.markdown, /第二步逆序卸载已启动插件/);
+  assert.match(out.markdown, /src\/plugin\/runtime\.cpp:430/);
+  assert.match(out.markdown, /specs\/design\/04-插件运行时\.md:88/);
+  assert.match(out.markdown, /违反不变量：加载失败必须 fail-closed/);
+  assert.match(out.markdown, /触发条件不再复现：符号缺失/);
+});

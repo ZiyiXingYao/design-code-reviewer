@@ -21,13 +21,15 @@
 ```
 F-001
 - 级别 / 镜头：P1 / 04 错误处理
-- 位置：文档 04-插件运行时.md:88（§3.2）；代码 src/plugin/runtime.cpp:430
-- 现象：加载失败后继续启动，后续空指针
+- 位置：代码 src/plugin/runtime.cpp:430（PluginHost::LoadAndStart）＋ 设计对照 04-插件运行时.md:88（§3.2）
+- 模块：插件运行时
+- 功能/流程：插件加载失败处理
+- 问题：代码现在是什么行为、违反了什么、缺什么（白话，不依赖触发条件即可读懂）
 - 触发条件：插件 .so 存在但符号缺失
 - 证据：if (h == nullptr) { LOG(WARN) << "skip"; }  // :430
 - 违反不变量：加载失败必须 fail-closed
 - 影响：整个插件运行时进入半初始化状态
-- 修法：返回错误并逆序卸载已启动插件
+- 怎么改：1) 返回错误 2) 逆序卸载已启动插件 3) 补失败用例
 - 置信度：high
 - 裁断：upheld（A-011）
 ```
@@ -40,16 +42,27 @@ F-001
   "level": "P1",
   "title": "加载失败后继续启动",
   "location": "src/plugin/runtime.cpp:430",
-  "doc_ref": "04-插件运行时.md:88",
+  "doc_ref": "04-插件运行时.md:88（§3.2）",
+  "module": "插件运行时",
+  "feature": "FP-7 插件加载",
+  "flow": "插件加载失败处理",
+  "problem": "加载失败只记 WARN 并继续启动，违反 fail-closed",
   "mechanism": "错误被吞掉",
   "trigger": "符号缺失",
   "evidence": "if (h == nullptr) { LOG(WARN) << \"skip\"; }",
   "invariant": "加载失败必须 fail-closed",
   "impact": "半初始化",
-  "suggestion": "返回错误",
+  "fix": "1) 返回错误 2) 逆序卸载已启动插件",
+  "suggestion": "返回错误（摘要字段，可为空）",
   "confidence": "high"
 }
 ```
+
+**字段纪律**：
+
+- `problem` 与 `fix` 是报告与 task.md 的正文来源，不许省略；`fix` 一步一行，禁止只写"修复该问题"。
+- `location` 必须是代码 `file:line`；设计对照放 `doc_ref`，报告里两者都要出现。
+- `suggestion` 只作摘要；下游一律优先 `fix`。
 
 ## 4 去重与排序
 

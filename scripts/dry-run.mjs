@@ -65,7 +65,8 @@ function seedFindings(dir, { type = "design", level = "P1" } = {}) {
   const f = {
     id: "F-001", level, title: "示例缺陷", location: type === "design" ? "03-订单模块.md:20" : "src/order/order_service.cpp:10",
     mechanism: "缺少校验", counterexample: "给定非法输入 → 越界 → 因为没有校验",
-    trigger: "非法输入", suggestion: "第一步补校验；第二步加回归用例", depends_on: [],
+    trigger: "非法输入", suggestion: "第一步补校验；第二步加回归用例", impact: "越界写坏数据", depends_on: [],
+    ...(type === "impl" ? { doc_ref: "03-订单模块.md:20（§3.1）", invariant: "非法输入必须拒绝" } : {}),
     sources: [{ batch: "b01", id: "F-001", level }]
   };
   J(join(dir, "05-findings.json"), { findings: [f] });
@@ -132,7 +133,7 @@ function initImpl(root, id) {
   commitBatch(dir, { payload: { batch: "b01", group: "s3", unit: "20 镜头", kind: "discrete", status: "done", covers: Array.from({ length: 20 }, (_, i) => ({ kind: "lens", id: String(i + 1) })), findings: [], coverage_note: "ok", cross_hints: [] } });
   seedFindings(dir, { type: "impl", level: "P1" });
   J(join(dir, "preflight.json"), { failures: [] });
-  writeFileSync(join(dir, "REPORT.md"), "# 实现评审报告\n基准：L1\nGate I 结论：有条件通过\n\n发现 F-001。\n对抗：成立率 1.00 / 有效辩护率 0.00 / 升级率 0.00 / 未决率 0.00\n");
+  writeFileSync(join(dir, "REPORT.md"), "# 实现评审报告\n基准：L1\nGate I 结论：有条件通过\n\n发现 F-001。\n对抗：成立率 1.00 / 有效辩护率 0.00 / 升级率 0.00 / 未决率 0.00\n\n## 7 发现清单\n\n### F-001 示例缺陷\n\n- **在哪**：`src/order/order_service.cpp:10`（OrderService::Create）＋ 设计对照 `03-订单模块.md:20`（§3.1）\n  - 模块：订单｜镜头：04 错误处理｜流程：示例流程\n- **什么问题**：缺少校验\n- **会怎样**：给定非法输入 → 越界 → 因为没有校验\n- **怎么改**：第一步补校验；第二步加回归用例\n");
   writeFileSync(join(dir, "SUMMARY.md"), summaryMd("有条件通过", "L1"));
   const t = run("skills/impl-review/scripts/state.mjs", ["transition", dir, "reported", "--reason", "B9 完成"]);
   if (t.status !== 0) throw new Error("transition reported 失败：" + t.stderr);
@@ -223,6 +224,11 @@ ok("impl: reported 即交付 2 件，task.md 尚未生成", () => {
 ok("impl: approve 交付 3 件", () => {
   const r = run("skills/impl-review/scripts/state.mjs", ["approve", implDir, "--reviewer", "dry-run"]);
   eq(r.status, 0, r.stderr);
+  const tmd = readFileSync(join(implDir, "task.md"), "utf8");
+  truthy(tmd.includes("第二步加回归用例"), "impl task.md 把分号后的改法截断了");
+  truthy(tmd.includes("src/order/order_service.cpp:10"), "impl task.md 缺代码位置");
+  truthy(tmd.includes("specs/design/03-订单模块.md:20"), "impl task.md 缺设计对照");
+  truthy(tmd.includes("违反不变量：非法输入必须拒绝"), "impl task.md 缺违反不变量");
   const root = implDir.split("/.design-code-reviewer/")[0];
   const audit = auditDir(root, "2026-01-01-impl");
   for (const f of ["REPORT.md", "SUMMARY.md", "task.md"]) truthy(existsSync(join(audit, f)), `交付缺 ${f}`);
