@@ -27,10 +27,10 @@ test("T9 隔离：任务书里的禁令齐全", () => {
   const blue = readFileSync(join(ROOT, "skills/design-review/adversarial/blue.md"), "utf8");
   const judge = readFileSync(join(ROOT, "skills/design-review/adversarial/judge.md"), "utf8");
 
-  assert.match(red, /禁止/);
+  assert.match(red, /Forbidden/);
   assert.match(red, /07-defense\.json/);
-  assert.match(blue, /结构化指控/);
-  assert.match(blue, /禁止/);
-  assert.match(judge, /禁止/);
-  assert.match(judge, /原始/);
+  assert.match(blue, /structured accusation/);
+  assert.match(blue, /Forbidden/);
+  assert.match(judge, /Forbidden/);
+  assert.match(judge, /raw/);
 });

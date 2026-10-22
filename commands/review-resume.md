@@ -1,41 +1,41 @@
 ---
-description: 恢复中断的设计/实现评审（扫描 .design-code-reviewer，按需选择）
+description: Resume an interrupted design/implementation review (scans .design-code-reviewer and lets you choose) — 恢复中断的设计/实现评审（扫描 .design-code-reviewer，按需选择）
 argument-hint: "[project-dir] [--list] [--id <YYYY-MM-DD>-<design|impl>] [--json]"
 allowed-tools: Bash, Read
 ---
 
-用户要求恢复评审。参数：`$ARGUMENTS`
+The user asks to resume a review. Arguments: `$ARGUMENTS`
 
-## 执行
+## Steps
 
-1. **确定工程根目录**：参数里第一个不以 `--` 开头的值；没有就用当前工作目录。后续称为 `<project>`。
-2. **调用 resume**（两个技能各带一份，任选其一；优先 design-review）：
+1. **Determine the project root**: the first argument that does not start with `--`; fall back to the current working directory. Referred to below as `<project>`.
+2. **Call resume** (each skill ships its own copy; either one works, design-review preferred):
 
    ```bash
-   node "$HOME/.codebuddy/skills/design-review/scripts/resume.mjs" <project> <其余参数>
+   node "$HOME/.codebuddy/skills/design-review/scripts/resume.mjs" <project> <remaining args>
    ```
 
-   如果该路径不存在，依次尝试 `impl-review`，或从仓库直接跑 `node skills/design-review/scripts/resume.mjs`。
+   If that path does not exist, try `impl-review` next, or run `node skills/design-review/scripts/resume.mjs` directly from the repository.
 
-3. **按退出码处理**：
+3. **Handle the exit code**:
 
-   | 退出码 | 含义 | 你要做的 |
+   | Exit code | Meaning | What you should do |
    |---|---|---|
-   | 0 | 已恢复，或没有未完成 | 若输出为"没有未完成的评审"，原样告知用户；否则进入第 4 步 |
-   | 1 | 目标已 closed | 告知用户不能恢复，要改结论必须开新一轮 |
-   | 2 | id 非法/不存在 | 让用户从 `--list` 里选 |
-   | 3 | 有多个未完成 | **把列表原样展示**，要求用户用 `--id` 指定；不要替用户选 |
-   | 4 | plan.json 被改动 | 说明 sha 不匹配，询问是否 `--force` |
+   | 0 | Resumed, or nothing left unfinished | If the output is "没有未完成的评审", report it to the user as is; otherwise continue with step 4 |
+   | 1 | The target is already closed | Tell the user it cannot be resumed; changing the conclusion requires a new round |
+   | 2 | The id is invalid or does not exist | Ask the user to pick from `--list` |
+   | 3 | Several reviews are unfinished | **Show the list as is** and ask the user to specify one with `--id`; do not choose for them |
+   | 4 | plan.json was modified | Explain the sha mismatch and ask whether to use `--force` |
 
-4. **继续评审**：带 `--json` 重跑一次，读取 `review_id`、`type`、`dir`、`next_batches`、`pending_steps`，然后：
-   - `type=design` → 按 design-review 技能继续；
-   - `type=impl` → 按 impl-review 技能继续。
-   - 只跑 `next_batches` 与 `pending_steps` 里未完成的；**已完成批不重跑**，**不要修改 plan.json**。
-   - 每批完成后用对应技能目录下的 `state.mjs batch` 落盘。
-5. **收口**：全部批完成后 `gate.mjs` → 通过才 `state.mjs promote`。
+4. **Continue the review**: rerun once with `--json` and read `review_id`, `type`, `dir`, `next_batches`, `pending_steps`, then:
+   - `type=design` → continue per the design-review skill;
+   - `type=impl` → continue per the impl-review skill.
+   - Run only the unfinished items in `next_batches` and `pending_steps`; **completed batches are not rerun**, and **do not modify plan.json**.
+   - After each batch, persist it with `state.mjs batch` from the corresponding skill directory.
+5. **Close out**: once all batches are done, run `gate.mjs` → only then `state.mjs promote`.
 
-## 注意
+## Notes
 
-- 不要手工编辑 `.design-code-reviewer/*/state.yaml`。
-- 恢复前若发现 `review.dir` 不存在或 state 解析失败，直接报告，不要重建目录。
-- 恢复是续跑，不是重审：判据、档位、批次划分都沿用原来的 `plan.json`。
+- Do not hand-edit `.design-code-reviewer/*/state.yaml`.
+- If `review.dir` does not exist or the state cannot be parsed before resuming, report it directly instead of recreating the directory.
+- Resuming continues a run, it is not a re-review: the criteria, profile and batch split all come from the original `plan.json`.

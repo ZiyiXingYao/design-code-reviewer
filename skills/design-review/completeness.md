@@ -1,49 +1,49 @@
-# 20 项功能漏项（判据二）
+# The 20 functional gap items (criterion two)
 
-**用法**：选 3–8 个核心功能点（不是每个都跑，会爆），每个功能点 × 20 项逐项问。
+**Usage**: pick 3–8 core feature points (not all of them — that explodes), and ask each feature point × 20 items one by one.
 
-## 两级筛（把 100 格压到 30 格深挖）
+## Two-level screening (compress 100 cells into 30 deep-dive cells)
 
-| 级 | 动作 | 要求 | 覆盖 |
+| Level | Action | Requirement | Coverage |
 |---|---|---|---|
-| **一级：快速判定** | 每格只标 `有 / 无 / 不确定 / 不适用` | 不要求位置，允许凭章节标题判断 | 全部 N×20 格 |
-| **二级：深挖** | 只对 `无` 与 `不确定` 的格 | 必须给：文档位置、缺口描述、判定（必须补/可接受） | 通常 25–35 格 |
+| **Level one: quick judgement** | Mark each cell only `有 / 无 / 不确定 / 不适用` (present / absent / unknown / N/A) | No location required; judging from section titles is allowed | All N×20 cells |
+| **Level two: deep dive** | Only cells marked `absent` and `unknown` | Must give: document location, gap description, judgement (must fix / acceptable) | Usually 25–35 cells |
 
-一级分流本身就是产出：它给出"哪 20 项没覆盖"的硬结论，深挖只是为缺口补证据。
+Level-one triage is itself an output: it gives the hard conclusion of "which of the 20 items are not covered"; the deep dive only adds evidence for the gaps.
 
-**合格标准**：有 → 指到章节；没有 → 记缺口；不适用 → 写理由。**不许留空。**
+**Pass standard**: `有` → point to the section; `无` → record the gap; `不适用` → write the reason. **Leaving a cell empty is not allowed.**
 
-## 20 项
+## The 20 items
 
-| # | 漏项 | 怎么问 | 合格标准 |
+| # | Gap item | How to ask | Pass standard |
 |---|---|---|---|
-| 1 | 幂等/去重 | 同一请求/消息重复到达会怎样？ | 有幂等键定义或去重机制 |
-| 2 | 超时与取消 | 执行中要取消，怎么打断？ | 有取消路径 + 中间态可退出 |
-| 3 | 部分失败与回滚 | 批量操作第 3 条失败，前 2 条怎么办？ | 定义部分成功语义 + 回滚或补偿 |
-| 4 | 重启恢复 | 进程重启后哪些状态还在？ | 外化字段清单 + 恢复顺序 |
-| 5 | 配置热更新 | 改配置要重启吗？ | 变更生效路径 + 生效粒度 |
-| 6 | 权限校验 | 谁能触发这个操作？ | 鉴权点 + 越权拒绝语义 |
-| 7 | 审计留痕 | 出问题能查到谁做的吗？ | 操作日志含主体/时间/对象 |
-| 8 | 限流/背压 | 洪峰来了会怎样？ | 限流阈值或背压传导机制 |
-| 9 | 数据清理/归档 | 数据涨到 10 年怎么办？ | 过期/归档/清理策略 |
-| 10 | 版本兼容 | 新旧版本并存会怎样？ | 字段增删的兼容策略 |
-| 11 | 多实例部署 | 起两个实例会冲突吗？ | 单例假设是否明示 + 分布式协调 |
-| 12 | 时钟依赖 | 跨机比较时间安全吗？ | 时钟源选择 + 单调性保证 |
-| 13 | 队列积压 | 积压 10 分钟后消费会怎样？ | 积压处理策略（丢弃/降级/告警） |
-| 14 | 资源上限 | 队列/线程池有界吗？ | 显式上限 + 超限行为 |
-| 15 | 状态收敛 | 不一致后会自己收敛吗？ | 收敛机制（对账/定时校正） |
-| 16 | 人工干预 | 自动流程卡住怎么救？ | 手动出口（重试/跳过/重置） |
-| 17 | 可观测性 | 出问题看什么？ | 关键指标 + 关键日志 + trace |
-| 18 | 数据迁移 | 加字段/改结构，存量数据怎么办？ | 回填方案 + 双写或灰度 |
-| 19 | 降级开关 | 出故障能否关掉某能力？ | 开关定义 + 降级后行为 |
-| 20 | 错误可恢复性 | 这个错误该重试还是该放弃？ | 错误分类 + 对应处置 |
+| 1 | Idempotency / deduplication | What happens if the same request/message arrives again? | An idempotency key or a dedup mechanism is defined |
+| 2 | Timeout and cancellation | If it must be cancelled mid-execution, how is it interrupted? | A cancel path + intermediate states that can exit |
+| 3 | Partial failure and rollback | Item 3 of a batch operation fails — what happens to the first 2? | Partial-success semantics defined + rollback or compensation |
+| 4 | Restart recovery | After a process restart, which state still exists? | A list of externalized fields + recovery order |
+| 5 | Config hot reload | Does changing config require a restart? | A path for changes to take effect + activation granularity |
+| 6 | Authorization | Who can trigger this operation? | Auth points + deny semantics for unauthorized access |
+| 7 | Audit trail | When something goes wrong, can we find out who did it? | Operation log with subject/time/object |
+| 8 | Rate limiting / backpressure | What happens when the flood arrives? | Rate-limit thresholds or a backpressure propagation mechanism |
+| 9 | Data cleanup / archival | What happens when data grows for 10 years? | Expiry/archival/cleanup policy |
+| 10 | Version compatibility | What happens when old and new versions coexist? | Compatibility policy for field additions and removals |
+| 11 | Multi-instance deployment | Do two instances conflict? | Whether the singleton assumption is stated + distributed coordination |
+| 12 | Clock dependency | Is comparing times across machines safe? | Clock-source choice + monotonicity guarantee |
+| 13 | Queue backlog | What happens when consumption lags by 10 minutes? | Backlog handling policy (drop/degrade/alert) |
+| 14 | Resource limits | Are queues/thread pools bounded? | Explicit limits + over-limit behavior |
+| 15 | State convergence | After divergence, does it converge by itself? | Convergence mechanism (reconciliation / periodic correction) |
+| 16 | Manual intervention | How do you rescue an automated flow that is stuck? | Manual exits (retry/skip/reset) |
+| 17 | Observability | When something goes wrong, what do you look at? | Key metrics + key logs + trace |
+| 18 | Data migration | When adding a field or changing structure, what about existing data? | Backfill plan + dual-write or canary |
+| 19 | Degradation switch | Can a capability be turned off during an incident? | Switch definition + behavior after degradation |
+| 20 | Error recoverability | Should this error be retried or abandoned? | Error classification + matching disposition |
 
-## 产出形态（必须是硬结论）
+## Output shape (must be a hard conclusion)
 
 ```
-功能点：任务终态收尾
-覆盖 14/20：有 1,2,4,7,11,12,13,14,15,16,17,19,20；缺 3(部分失败),5(配置热更),8(限流),9(归档),10(版本兼容),18(数据迁移)
-→ 缺口中 3/8/18 判定为"必须补"（任务收尾涉及跨服务写入，部分失败无定义会导致状态不一致）
+Feature point: task terminal-state finalization
+Covered 14/20: present 1,2,4,7,11,12,13,14,15,16,17,19,20; missing 3 (partial failure), 5 (config hot reload), 8 (rate limiting), 9 (archival), 10 (version compatibility), 18 (data migration)
+→ Among the gaps, 3/8/18 are judged "must fix" (finalization involves cross-service writes; undefined partial failure leads to inconsistent state)
 ```
 
-反例：写"整体考虑较全面"= 未执行本项。
+Counterexample: writing "overall reasonably considered" = this item was not executed.

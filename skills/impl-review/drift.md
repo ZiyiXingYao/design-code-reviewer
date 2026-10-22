@@ -1,39 +1,39 @@
-# DR-1~DR-8 漂移分类
+# DR-1~DR-8 Drift Classification
 
-| 代号 | 类型 | 定义 | 级别 |
+| Code | Type | Definition | Level |
 |---|---|---|---|
-| DR-1 | 无实现 | 文档登记，代码无 | P1 |
-| DR-2 | 改名未回写 | 代码改名/改签名，文档没跟 | P2 |
-| DR-3 | 行为不符 | 符号都在，语义/顺序/判据不同 | P0/P1 |
-| DR-4 | 残留 | 已删概念仍被引用或仍有代码 | P2 |
-| DR-5 | 内部矛盾 | 同一/跨文档两处冲突 | P1 |
-| DR-6 | 设计缺口 | 代码有整块功能，文档无设计 | **不计缺陷**（报告 §5 提示，不进 task.md） |
-| DR-7 | 模板不合规 | 编号/章节/表格列缺失 | P3 |
-| DR-8 | 承诺未兑现 | 勾了 `[x]` 但未达标（含假测试） | **P0** |
+| DR-1 | No implementation | Registered in the docs, absent from the code | P1 |
+| DR-2 | Renamed without write-back | Code renamed/re-signatured, docs not updated | P2 |
+| DR-3 | Behavior mismatch | All symbols present, but semantics/ordering/criteria differ | P0/P1 |
+| DR-4 | Residue | A deleted concept is still referenced or still has code | P2 |
+| DR-5 | Internal contradiction | Two conflicting statements within or across docs | P1 |
+| DR-6 | Design gap | A whole block of functionality exists in code with no design in the docs | **Not a defect** (report §5 note, not in task.md) |
+| DR-7 | Template non-compliance | Missing numbering/sections/table columns | P3 |
+| DR-8 | Commitment unfulfilled | `[x]` checked but not actually met (including fake tests) | **P0** |
 
-## 判定要点
+## Decision Points
 
-- **DR-1 与 DR-6 不对称**：文档有代码无 = 欠账，是缺陷（P1）；代码有文档无 = 设计缺口，只记提示。设计文档不可能面面俱到，实现补充设计未写的内容不算错。
-- **DR-3 最需要证据**：不能因为"看起来不一样"就报，必须给出"文档说 A、代码做 B、在什么输入下后果不同"。
-- **DR-4 是高频真实问题**：设计里删掉的字段/类，代码仍在写或别处仍在读。扫法：从 change-list 的「文件修改台账」找"删除/改名"条目，全仓反向引用。
-- **DR-5 的典型形态**：同一概念在 00 与 03 定义不同；必须先判定哪份是权威（通常 00 契约优先），再定级。
-- **DR-6 的典型形态**：整块模块已实现并被多处依赖，架构文档仍写"未设计"。
-- **DR-8 是全流程最危险的一类**：它让所有人以为已完成。识别 = `[x]` + 验收标准里的测试在 `test/` 找不到。
+- **DR-1 and DR-6 are asymmetric**: doc has it, code does not = debt, a defect (P1); code has it, doc does not = design gap, a note only. Design docs cannot cover everything, so an implementation filling in what the design did not write is not an error.
+- **DR-3 needs the most evidence**: never report it just because "it looks different"; you must state "the doc says A, the code does B, and the consequence differs under this input".
+- **DR-4 is a high-frequency real problem**: fields/classes removed from the design are still being written in code or still being read elsewhere. Scan method: find "delete/rename" entries in the change-list's "file change ledger", then grep reverse references repo-wide.
+- **Typical DR-5 shape**: the same concept is defined differently in 00 and 03; first decide which one is authoritative (usually the 00 contract wins), then assign the level.
+- **Typical DR-6 shape**: a whole module is implemented and depended on in many places, while the architecture doc still says "not designed".
+- **DR-8 is the most dangerous class in the whole pipeline**: it makes everyone believe the work is done. Detection = `[x]` + a test named in the acceptance criteria that cannot be found in `test/`.
 
-## 与五类对照的关系
+## Relationship to the Five-Category Cross-Check
 
-| 对照类型 | 主要产出 |
+| Cross-check category | Main output |
 |---|---|
-| 结构对照 | DR-1（DR-6 只记提示） |
-| 行为对照 | DR-3 |
-| 需求对照 | DR-1（缺失 = P1） |
-| 约束对照 | DR-8（违反负向约束 = P0） |
-| 验收对照 | DR-8（假勾选 = P0） |
+| Structure | DR-1 (DR-6 recorded as a note only) |
+| Behavior | DR-3 |
+| Requirement | DR-1 (missing = P1) |
+| Constraint | DR-8 (violating a negative constraint = P0) |
+| Acceptance | DR-8 (false checkmark = P0) |
 
-## 三态归类（B5）
+## Three-State Classification (B5)
 
-机器核对输出 `found / missing / unverifiable`；`missing` 必须归为「真缺失 / 改名未回写 / 表达差异」之一，未归类不计入统计。
+The mechanical check outputs `found / missing / unverifiable`; every `missing` must be classified as one of "truly missing / renamed without write-back / expression difference", and unclassified items are not counted in the statistics.
 
-- 真缺失 → DR-1
-- 改名未回写 → DR-2
-- 表达差异 → 不报，记入 `unverifiable` 说明
+- Truly missing → DR-1
+- Renamed without write-back → DR-2
+- Expression difference → do not report, record in the `unverifiable` notes

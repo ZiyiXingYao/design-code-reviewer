@@ -1,39 +1,39 @@
-# profiles/：语言与行业特化（可选层）
+# profiles/: Language and Industry Specializations (optional layer)
 
-核心判据不含任何语言 API、行业术语、项目路径。特化只能放在这里，**只增不改**：
+The core criteria contain no language API, industry term or project path. Specialization may live only here, and is **append-only, never modify**:
 
-- 只能追加检查点与案例；
-- **不能修改核心判据的级别上限**；
-- 每条领域检查点必须写"归约到哪条通用原则"，否则不许进入本目录（黑箱经验无法复用也无法反驳）。
+- it may only append checkpoints and cases;
+- it **must not change the level caps of the core criteria**;
+- every domain checkpoint must state "which general principle it reduces to", otherwise it is not allowed into this directory (black-box experience can neither be reused nor refuted).
 
-## 声明格式
+## Declaration Format
 
 ```yaml
 name: cpp
 applies_to: ["*.cpp", "*.h", "*.hpp"]
 extends:
-  - {lens: 12-memory-safety, add_checks: ["移动后使用", "虚析构缺失"]}
-  - {lens: 01-lifetime,     add_checks: ["shared_ptr 循环引用"]}
+  - {lens: 12-memory-safety, add_checks: ["use after move", "missing virtual destructor"]}
+  - {lens: 01-lifecycle-ownership,     add_checks: ["shared_ptr reference cycle"]}
 provides_cases: true
 ```
 
-没有匹配 profile 时按 core 跑：通用判据仍然有效，只是少了语言级细节。
+When no profile matches, run as core: the general criteria still hold, only the language-level details are missing.
 
-## 目录约定
+## Directory Convention
 
 ```
 profiles/
-├── README.md        # 本文件
-├── _template.md     # 新建 profile 的骨架
-└── <name>.md        # 具体 profile（按需添加）
+├── README.md        # this file
+├── _template.md     # skeleton for a new profile
+└── <name>.md        # concrete profiles (add as needed)
 ```
 
-## 归约示例
+## Reduction Examples
 
-| 领域坑 | 归约到的通用判据 |
+| Domain pitfall | General criterion it reduces to |
 |---|---|
-| 同一实体的状态被多线程驱动，顺序错乱 | CONC-2：有归属 key 的实体，其状态是否只由单一 owner 处理 |
-| 全局锁保护大只读对象，写者阻塞全体读者 | CONC-6：读多写少是否走不可变快照 |
-| 发往同一对端的消息被多线程直写，破坏序号递增 | CONC-1/2：发往同一对端是否单线程按序写出 |
+| The same entity's state is driven by multiple threads and ends up out of order | CONC-2: for an entity with an ownership key, is its state handled by a single owner only |
+| A global lock protects a large read-only object, so writers block all readers | CONC-6: for read-mostly data, is an immutable snapshot used |
+| Messages to the same peer are written directly by multiple threads, breaking sequence monotonicity | CONC-1/2: are messages to the same peer written out by a single thread, in order |
 
-写不出归约的条目 = 行业传说，删除。
+An entry that cannot state its reduction = industry folklore; delete it.

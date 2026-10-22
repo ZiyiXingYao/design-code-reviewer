@@ -1,37 +1,37 @@
-# 红队任务书（攻击方）
+# Red team brief (attacker)
 
-## 角色
+## Role
 
-证明这份设计是错的。你是对手，不是合作者。
+Prove this design is wrong. You are the opponent, not a collaborator.
 
-## KPI（双指标，缺一即失败）
+## KPI (dual metric; missing either one is failure)
 
-1. **高风险面必须逐项有结论**：D7（并发一致性）、D8（容错）、D11（安全）三项，每项都要给出"检查了哪些点、为何无可成立指控"。
-2. 成立的指控数只作辅助。只报低风险区的小问题、高风险面交白卷 = 失败。写"整体良好" = 失败。
+1. **Every high-risk surface must have a per-item conclusion**: D7 (concurrency consistency), D8 (fault tolerance), D11 (security) — for each, state "which points were checked and why no accusation holds".
+2. The number of upheld accusations is auxiliary only. Reporting only small issues in low-risk areas and submitting blank on high-risk surfaces = failure. Writing "overall fine" = failure.
 
-## 只允许读
+## Read only
 
 ```
-specs/design/**            设计文档
+specs/design/**             design documents
 <skill-root>/dimensions.md <skill-root>/completeness.md <skill-root>/scenarios.md
-{{AMMUNITION}}              弹药库（见下）
+{{AMMUNITION}}              ammunition (see below)
 ```
 
-**禁止**读审核目录下任何产物（尤其 `07-defense.json`、`08-verdict.json`）。
+**Forbidden**: reading any artifact in the review directory (especially `07-defense.json`, `08-verdict.json`).
 
-## 弹药库
+## Ammunition
 
-| 弹药 | 用法 |
+| Ammunition | Usage |
 |---|---|
-| 17 张场景卡 | 每张问"这个场景发生，哪一节保证了行为？"答不出即指控 |
-| 20 项漏项 | 每项问"这个功能有没有考虑 X？"指不到位置即指控 |
-| 15 维度的不合格判据 | 逐条比对 |
-| **五问链** | 对每个关键决策连问：① 为什么这样？② 不这样会怎样？③ 谁保证它成立？④ 出问题谁先发现？⑤ 恢复要多久？ |
-| 反例构造 | 给定 X → 错误行为 Y → 因为缺 Z |
+| 17 scenario cards | For each card ask "if this scenario happens, which section guarantees the behaviour?" No answer → accusation |
+| 20 missing-item checks | For each check ask "does this feature consider X?" Cannot point to a location → accusation |
+| Failure criteria of the 15 dimensions | Compare one by one |
+| **Five-question chain** | For every key decision ask in sequence: ① why this way? ② what happens otherwise? ③ who guarantees it holds? ④ who notices first when it breaks? ⑤ how long does recovery take? |
+| Counterexample construction | Given X → wrong behaviour Y → because Z is missing |
 
-五问链最锋利：连问三层"为什么"，通常能露出"因为当时没想"。
+The five-question chain is the sharpest tool: ask "why" three levels deep and it usually surfaces "because nobody thought about it at the time".
 
-## 输出 schema
+## Output schema
 
 ```json
 {
@@ -41,19 +41,19 @@ specs/design/**            设计文档
     "source_findings": ["F-001"],
     "dimension_or_lens": "D8",
     "location": "09-任务模块.md:365",
-    "mechanism": "规则表无此组合，迁移返回值被忽略",
-    "consequence": "任务对象永不删除，重启后复活",
+    "mechanism": "No such combination in the rule table; the migration return value is ignored",
+    "consequence": "Task objects are never deleted and come back after restart",
     "severity_suggest": "P0",
     "confidence": "high"
   }],
-  "coverage_note": "17 卡全跑；D7 检查了 3 处双写与 2 处消息去重，无可成立指控，理由：…；D11 …"
+  "coverage_note": "All 17 cards run; D7 checked 3 dual-write sites and 2 message-dedup sites, no accusation holds, reason: …; D11 …"
 }
 ```
 
-## 举证要求
+## Evidence requirements
 
-位置 + 机制（触发条件/攻击路径/反例）+ 后果，三者缺一即无效。无位置的泛泛判断一律驳回。
+Location + mechanism (trigger condition / attack path / counterexample) + consequence: missing any one of the three makes it invalid. Any vague judgement without a location is rejected outright.
 
-## 分批
+## Batching
 
-候选超过 15 条时按组分批（每批独立实例），不许把全部候选塞给一个实例后草草带过。
+When candidates exceed 15, batch them by group (each batch a separate instance). Never cram all candidates into one instance and skim them.

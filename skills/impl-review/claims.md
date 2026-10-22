@@ -1,53 +1,53 @@
-# 断言抽取与核对
+# Assertion Extraction and Verification
 
-设计文档里的**清单表天然是断言集**。核心只定义"断言类型"，不定义"哪个文件第几节"——后者交给 adapter。
+**List tables in design docs are naturally assertion sets.** The core defines only "assertion types", never "which file, which section" — the latter is delegated to the adapter.
 
-## 1 断言类型
+## 1 Assertion Types
 
-| 类型 | 文档中的形态 | 代码侧核对点 |
+| Type | Form in the docs | Code-side verification point |
 |---|---|---|
-| 实体 | 实体/表清单 | schema 定义、DAO 常量 |
-| 字段 | 字段表 | DDL、记录结构 |
-| 键 / 路径 / 主题 | 清单表里的字符串模式 | 常量定义、字符串字面量 |
-| 接口 | 清单表里的"方法 + 路径" | 路由注册、调用点 |
-| 类 / 类型 | 类清单、详细设计小节 | 类型定义、别名 |
-| 状态机 | 状态枚举 + 转移表 | 枚举定义、转移表 |
-| 调用顺序 | 时序图 | 调用链 |
+| Entity | entity/table list | schema definitions, DAO constants |
+| Field | field table | DDL, record structures |
+| Key / path / topic | string patterns in list tables | constant definitions, string literals |
+| Interface | "method + path" in list tables | route registration, call sites |
+| Class / type | class list, detailed design sections | type definitions, aliases |
+| State machine | state enum + transition table | enum definitions, transition table |
+| Call sequence | sequence diagram | call chain |
 
-## 2 archify adapter 映射
+## 2 archify Adapter Mapping
 
-| 文档 | 小节 | 断言类型 |
+| Document | Section | Assertion type |
 |---|---|---|
-| `00-接口契约.md` | §1.1 表清单 / §1.2 字段 / §2.1 键 / §3.1 主题 / §4.1 接口 | 实体 / 字段 / 键 / 主题 / 接口 |
-| `01-架构设计.md` | §6 模块划分 / §7 跨模块接口矩阵 / §8 核心类设计 / §9 文件树 | 类 / 接口 / 目录 |
-| `02-实体与数据设计.md` | §5 状态机 / §1 总览 | 状态机 / 实体 |
-| `NN-模块.md` | §2.1 类清单 / §3.x 类详细设计 / §6 状态机 | 类 / 字段 / 状态机 |
-| `diagrams/*.sequence.json` | 节点序列 | 调用顺序 |
+| `00-接口契约.md` | §1.1 table list / §1.2 fields / §2.1 keys / §3.1 topics / §4.1 interfaces | entity / field / key / topic / interface |
+| `01-架构设计.md` | §6 module split / §7 cross-module interface matrix / §8 core class design / §9 file tree | class / interface / directory |
+| `02-实体与数据设计.md` | §5 state machine / §1 overview | state machine / entity |
+| `NN-模块.md` | §2.1 class list / §3.x detailed class design / §6 state machine | class / field / state machine |
+| `diagrams/*.sequence.json` | node sequence | call sequence |
 
-换一套文档工具时只换 adapter，核心判据不动。
+Switching to a different doc toolchain means swapping only the adapter; the core criteria stay unchanged.
 
-## 3 三态与归类
+## 3 Three States and Classification
 
 ```
 node <skill-root>/scripts/claims.mjs <projectRoot> --out <reviewDir>/claims.json [--scope src/]
 ```
 
-输出每类断言的 `found / missing / unverifiable` 计数与明细。规则：
+The output gives `found / missing / unverifiable` counts and details per assertion type. Rules:
 
-- `found`：在代码中找到同名符号/字面量（区分大小写与命名族）。
-- `missing`：全仓无匹配 → 必须人工归为「真缺失 / 改名未回写 / 表达差异」。
-- `unverifiable`：文档表述无法机械匹配（如"由插件负责"）→ 不计入统计，列入附录。
-  当前 `claims.mjs` 只产出 found/missing；需要语义判断的断言由评审者人工补 `unverifiable` 并说明理由。
+- `found`: a symbol/literal with the same name is found in the code (case and naming family are distinguished).
+- `missing`: no match repo-wide → must be manually classified as "truly missing / renamed without write-back / expression difference".
+- `unverifiable`: the doc wording cannot be matched mechanically (e.g. "the plugin is responsible") → not counted in the statistics, listed in the appendix.
+  Currently `claims.mjs` only produces found/missing; assertions that need semantic judgment are added as `unverifiable` manually by the reviewer, with reasons.
 
-## 4 实测基线（用于校准期望值）
+## 4 Measured Baseline (for calibrating expectations)
 
-一次真实项目：369 条断言；契约层（MQ 43/43、Redis 14/14、MySQL 表 12/12、HTTP 1/1）全命中；class 108 条中 39 条 missing，其中 33 条为子模块未检出的**假阴性**。
+A real project: 369 assertions; the contract layer hit 100% (MQ 43/43, Redis 14/14, MySQL tables 12/12, HTTP 1/1); of 108 class assertions, 39 were missing, and 33 of those were **false negatives** from submodules that had not been checked out.
 
-**结论**：
-1. 契约层可自动化且低噪声；
-2. 类层必须人工归类；
-3. **先做子模块体检**（preflight），否则 missing 数会被假阴性污染。
+**Conclusions**:
+1. The contract layer can be automated with low noise;
+2. The class layer must be classified manually;
+3. **Run the submodule preflight first**, otherwise the missing count is polluted by false negatives.
 
-## 5 机械附带发现
+## 5 Incidental Mechanical Findings
 
-清单表编号跳号（如 12→15、5→5.1）人眼几乎不可能发现，但属于工艺缺陷（DR-7 = P3）。`claims.mjs` 会一并报出。
+Gaps in list-table numbering (e.g. 12→15, 5→5.1) are almost impossible to spot by eye but are craftsmanship defects (DR-7 = P3). `claims.mjs` reports them as well.

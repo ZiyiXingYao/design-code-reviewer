@@ -1,60 +1,60 @@
-# 编排者任务书（主 agent 执行，不含判断）
+# Orchestrator brief (run by the main agent, no judgement)
 
-主 agent 只做分派、收集、状态推进、闸门，**不参与任何指控成立与否的判断**。
+The main agent only dispatches, collects, advances state, and gates. It **takes no part in judging whether an accusation holds**.
 
-## 1 分派时序
+## 1 Dispatch sequence
 
 ```
-A0 契约校验 → A0.5 写 plan.json（批次 + 材料路由）→ 扫描层 7 组并行（波次上限 4）
-  → A4.5 去重 → 对抗层 red → blue → judge（串行，只对 P0/P1）→ 元审（可选）→ gate
+A0 contract check → A0.5 write plan.json (batches + material routing) → scan layer, 7 groups in parallel (max 4 per wave)
+  → A4.5 dedup → adversarial layer red → blue → judge (serial, only for P0/P1) → meta review (optional) → gate
 ```
 
-## 2 任务书构造规则
+## 2 Brief construction rules
 
-每份子代理任务书必须自包含（子代理看不到主会话）：
+Every sub-agent brief must be self-contained (sub-agents cannot see the main session):
 
-1. 角色与 KPI（含"高风险面必须逐项有结论"）
-2. 允许读的路径白名单 + 禁止读的路径
-3. 弹药库路径（给路径，不塞全文）
-4. 输出 schema
-5. 举证要求
-6. 覆盖声明要求
+1. Role and KPI (including "every high-risk surface must have a per-item conclusion")
+2. Whitelist of readable paths + forbidden paths
+3. Ammunition paths (give paths, do not paste the full text)
+4. Output schema
+5. Evidence requirements
+6. Coverage statement requirements
 
-**禁止**在任务书里写"我猜这里有 X"或任何主 agent 的结论；也不要转述其他子代理的发现（S7 例外：它的输入就是前六组发现）。
+**Never** put "I suspect X is here" or any conclusion of the main agent into a brief, and never relay another sub-agent's findings (exception S7: its input is the findings of the first six groups).
 
-## 3 路径白名单
+## 3 Path whitelist
 
-| 角色 | 可读 | 禁止读 |
+| Role | May read | Forbidden |
 |---|---|---|
-| scout-s1..s7 | 该组材料清单 + 共享池 | 其他组材料；`batches/` 下其他组产物 |
-| scout-s7 | 前六组批产物（只读 findings/cross_hints） | 原始设计文档 |
-| red | 设计文档 + 弹药库 | 审核目录任何产物（尤其 07-defense.json） |
-| blue | 结构化指控条目 + 设计文档 | 06 的推理过程；红队语气 |
-| judge | 06/07 两份结构化数据 | 任何原始文档/代码 |
-| meta | 红队弹药使用说明 + 08 的 stats | 指控与辩护内容 |
+| scout-s1..s7 | the material list of its own group + shared pool | other groups' materials; other groups' artifacts under `batches/` |
+| scout-s7 | batch artifacts of the first six groups (read-only findings/cross_hints) | raw design documents |
+| red | design documents + ammunition | any artifact in the review directory (especially 07-defense.json) |
+| blue | structured accusation entries + design documents | the reasoning process of 06; red-team tone |
+| judge | the two structured datasets 06/07 | any raw document/code |
+| meta | red-team ammunition usage notes + stats of 08 | accusation and defense content |
 
-隔离靠三层：路径白名单、内容裁剪（只给结构化字段）、编号打散（给裁判的指控编号不按原顺序）。
+Isolation rests on three layers: path whitelist, content trimming (only structured fields), id shuffling (the accusation ids handed to the judge are not in their original order).
 
-## 4 校验与重试
+## 4 Validation and retry
 
-| 情况 | 处置 |
+| Situation | Handling |
 |---|---|
-| 返回不是合法 JSON / 缺字段 | 打回重跑，同一子代理最多 2 次 |
-| 红队无 `coverage_note` 或明显跳项 | 视为未完成，重跑 |
-| 发现"部分成立"类折中裁断 | 打回，要求三态 |
-| 连续 2 次不合格 | 记 `failed`，gate 拦截，**不出报告** |
-| 超时 | 判失败；整轮超时保留已完成条目并标 `partial` |
+| return is not valid JSON / missing fields | send back and rerun; at most 2 times per sub-agent |
+| red team has no `coverage_note` or clearly skips items | treat as incomplete, rerun |
+| a compromise verdict such as "partially valid" appears | send back, require the three-state form |
+| 2 consecutive rejections | record `failed`, gate blocks, **no report produced** |
+| timeout | mark as failed; on a whole-round timeout keep the completed entries and mark `partial` |
 
-## 5 落盘
+## 5 Persistence
 
-- 每批产物先写 `batches/<id>.json`（由 `state.mjs batch` 原子落盘），再记 `agent` 记录。
-- 指控/辩护/裁断原样落 `06/07/08.json`，主 agent **不改写、不合并、不润色**。
-- 指标由 `08-verdict.json.stats` 计算，不让子代理自报。
+- Write each batch artifact to `batches/<id>.json` first (atomically, via `state.mjs batch`), then record the `agent` entry.
+- Accusations/defenses/verdicts are persisted verbatim into `06/07/08.json`; the main agent **does not rewrite, merge, or polish** them.
+- Metrics are computed from `08-verdict.json.stats`; sub-agents are never allowed to self-report them.
 
-## 6 子代理记录（可审计）
+## 6 Sub-agent records (auditable)
 
 ```
 node <skill-root>/scripts/state.mjs agent <reviewDir> --role scout-s3 --agent-id sub-a03 --findings 9 --retries 1 --coverage-note "…"
 ```
 
-即使全部用同一模型，也要记录实例与重试次数——这是"独立审核确实发生过"的唯一证据。
+Even when every instance runs on the same model, record the instance and the retry count — this is the only evidence that "an independent review actually happened".

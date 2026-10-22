@@ -1,36 +1,36 @@
-# 17 张场景卡（判据三）
+# The 17 scenario cards (criterion three)
 
-**用法**：每张卡问同一个问题——"这个场景发生，系统会怎样？设计里哪一节保证了这个行为？"
+**Usage**: every card asks the same question — "if this scenario happens, what does the system do? Which section of the design guarantees that behavior?"
 
-- **合格**：能指到具体章节，且该章节确实保证了这个行为。
-- **不合格**：指不到；或指到的章节只描述了成功路径。
+- **Pass**: a specific section can be pointed to, and that section really guarantees the behavior.
+- **Fail**: no section can be pointed to; or the section pointed to only describes the happy path.
 
-卡片与行业无关；领域专属场景由 `profiles/` 追加。
+The cards are industry-independent; domain-specific scenarios are appended by `profiles/`.
 
-| 类 | # | 场景 | 典型缺口形态 |
+| Class | # | Scenario | Typical gap shape |
 |---|---|---|---|
-| **故障** | F1 | 主数据库不可用 30 秒 | 只读能力能否降级；启动期 DB 失败是否导致起不来 |
-| | F2 | 消息中间件积压 10 分钟 | 积压期新指令是否排队；有无丢弃策略；位点如何提交 |
-| | F3 | 某实例 OOM 重启 | 重启恢复哪些状态；刚写入的状态丢了怎么办 |
-| | F4 | 网络分区（两个服务互相不可见） | 对端状态不可见时如何决策；恢复后如何对账 |
-| | F5 | 时钟跳变（NTP 校时） | 用墙钟算超时会出现负值/提前超时 |
-| **容量** | C1 | 主实体数量 ×10 | 处理是否全量遍历；内存态能否承载；是否单点瓶颈 |
-| | C2 | 请求/上报频率 ×10 | 有无背压；队列是否无界；压力是否传导到上游 |
-| | C3 | 单份数据规模 ×10（地图/索引/配置） | 加载时间、遍历复杂度、内存放大 |
-| | C4 | 单个分区的并发 ×10 | 锁竞争；写放大；热点 key |
-| **变更** | V1 | 新增一类实体/类型 | 字段是否可扩展；有无硬编码枚举；要改几处 |
-| | V2 | 更换中间件实现 | 抽象是否隔离；协议层是否耦合实现细节 |
-| | V3 | 新增一个部署单元/区域 | 聚合键是否支持；跨单元状态是否成立 |
-| | V4 | 依赖库升级（导出面变更） | 适配层是否隔离；兼容策略 |
-| **运维** | O1 | 滚动升级（新旧版本并存） | 契约兼容；数据格式兼容；如何区分版本 |
-| | O2 | 单实例重启恢复 | 恢复顺序；恢复期是否接新请求；重复恢复是否幂等 |
-| **安全** | S1 | 信任边界被突破（内网有攻击者） | 身份是否逐请求校验；服务间是否鉴权；能否伪造指令 |
-| | S2 | 密钥轮换 | 轮换期新旧密钥是否并存；密钥来源是否可热更 |
+| **Failure** | F1 | Primary database unavailable for 30 seconds | Can read-only capability degrade; does a DB failure at startup prevent booting |
+| | F2 | Message middleware backlog for 10 minutes | Do new commands queue during the backlog; is there a drop policy; how are offsets committed |
+| | F3 | An instance OOMs and restarts | Which state is recovered on restart; what happens to state written just before |
+| | F4 | Network partition (two services cannot see each other) | How to decide when the peer's state is invisible; how to reconcile after recovery |
+| | F5 | Clock jump (NTP correction) | Computing timeouts with wall-clock time yields negative values / premature timeouts |
+| **Capacity** | C1 | Primary entity count ×10 | Does processing traverse everything; can in-memory state hold it; is there a single-point bottleneck |
+| | C2 | Request/report frequency ×10 | Is there backpressure; are queues unbounded; does the pressure propagate upstream |
+| | C3 | Single data set size ×10 (map/index/config) | Load time, traversal complexity, memory amplification |
+| | C4 | Concurrency within one shard ×10 | Lock contention; write amplification; hot keys |
+| **Change** | V1 | Adding a new kind of entity/type | Are fields extensible; are there hard-coded enumerations; how many places must change |
+| | V2 | Replacing a middleware implementation | Is the abstraction isolating; does the protocol layer couple implementation details |
+| | V3 | Adding a deployment unit/region | Does the aggregation key support it; does cross-unit state still hold |
+| | V4 | Upgrading a dependency library (exported surface changes) | Is an adapter layer isolating; compatibility policy |
+| **Operations** | O1 | Rolling upgrade (old and new versions coexisting) | Contract compatibility; data-format compatibility; how versions are distinguished |
+| | O2 | Single-instance restart recovery | Recovery order; does it accept new requests during recovery; is repeated recovery idempotent |
+| **Security** | S1 | Trust boundary breached (an attacker inside the intranet) | Is identity verified per request; is there service-to-service authorization; can commands be forged |
+| | S2 | Key rotation | Do old and new keys coexist during rotation; is the key source hot-reloadable |
 
-**输出形态**：
+**Output shape**:
 
 ```
-17 张卡 → 有明确保障 11 张 / 无保障 4 张（F3 重启时刚写的状态会丢、C2 无背压、O1 未设计新旧并存、S1 身份仅连接态）/ 不适用 2 张
+17 cards → clearly guaranteed 11 / no guarantee 4 (F3 state written just before restart is lost, C2 no backpressure, O1 old/new coexistence not designed, S1 identity only from connection state) / N/A 2
 ```
 
-不适用的卡必须写理由；不许跳过。
+Cards marked N/A must have a reason; skipping is not allowed.

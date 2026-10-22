@@ -1,32 +1,32 @@
-# archify 产物契约（必需层）
+# archify artifact contract (required layer)
 
-本技能只评审 brainstorming-archify 的产物。契约不匹配时**停下来报错**，不许"尽力而为"地猜——猜错会让断言抽取错位，整份报告失效而不自知。
+This skill reviews only brainstorming-archify artifacts. When the contract does not match, **stop and raise an error**; do not "do your best" and guess — a wrong guess misaligns assertion extraction and invalidates the whole report without anyone noticing.
 
-## 1 固定路径与编号
+## 1 Fixed paths and numbering
 
 ```
-specs/design/00-接口契约.md          必需；`00-` 是固定字面前缀，不参与模块序号
-specs/design/01-架构设计.md          必需；固定 01
-specs/design/02-实体与数据设计.md     必需；固定 02
-specs/design/03..NN-<模块>.md        必需，≥1 个；编号从 03 连续递增
-specs/design/task.md                必需；实现任务清单
-specs/design/diagrams/              建议；缺失记 P3
-.brainstorming-archify/state.yaml    必需
-.brainstorming-archify/change-lists/*.md  必需
+specs/design/00-接口契约.md          required; `00-` is a fixed literal prefix and does not participate in module numbering
+specs/design/01-架构设计.md          required; fixed 01
+specs/design/02-实体与数据设计.md     required; fixed 02
+specs/design/03..NN-<module>.md     required, ≥1; numbering increments contiguously from 03
+specs/design/task.md                required; implementation task list
+specs/design/diagrams/              recommended; missing = P3
+.brainstorming-archify/state.yaml    required
+.brainstorming-archify/change-lists/*.md  required
 ```
 
-**命名纪律**：`0-接口契约.md`、`接口契约.md`、`contract.md` 都是缺陷（P2）。
-模块文档"只追加、不重编号"：新增模块接在最大编号之后；删除模块留下的空号必须在该文档或变更清单中说明。
+**Naming discipline**: `0-接口契约.md`, `接口契约.md`, `contract.md` are all defects (P2).
+Module documents are "append only, never renumber": a new module is appended after the highest number; the hole left by a deleted module must be explained in that document or in the change list.
 
-## 2 state.yaml schema（schema_version = 1）
+## 2 state.yaml schema (schema_version = 1)
 
 ```yaml
-# 本文件只允许由 scripts/task-state/change-state.mjs 编辑
+# This file may only be edited by scripts/task-state/change-state.mjs
 schema_version: 1
 state: "closed"            # explore | draft | confirm | closed
 files:
   - path: "specs/design/00-接口契约.md"
-    status: "confirmed"    # 每份文档的确认态
+    status: "confirmed"    # confirmation status of each document
 reopens:
   - at: "2026-10-13T01:26:12.184Z"
     reason: "…"
@@ -35,65 +35,65 @@ change_list:
   path: ".brainstorming-archify/change-lists/20261019T095928Z-<slug>.md"
   set_at: "…"
 task_md: "specs/design/task.md"
-log: []                    # 可选
+log: []                    # optional
 ```
 
-**校验规则**：
-- 缺 `schema_version` / `state` / `files` / `reopens` 任一项 → 无法判等级，**保守按 draft 处理**并告警。
-- `change_list.path` 指向的文件必须存在，且是最后一次变更。
-- `reopens[].files` 用于风险加权：同一文档 reopen ≥3 次 → 该文档逐节细查。
+**Validation rules**:
+- If any of `schema_version` / `state` / `files` / `reopens` is missing → the level cannot be determined; **treat conservatively as draft** and warn.
+- The file pointed to by `change_list.path` must exist and must be the latest change.
+- `reopens[].files` is used for risk weighting: the same document reopened ≥3 times → examine that document section by section.
 
-**状态门禁**：
+**State gate**:
 
-| state | design 技能处置 |
+| state | design skill disposition |
 |---|---|
-| `closed` | 基准可用，结论可作 Gate D 依据 |
-| `confirm` | 可对照，报告标「基准未冻结」，对照类结论仅参考 |
-| `draft` / `explore` | 不拒绝，但结论标 `参考`，**不得用于 Gate D 放行**（设计还在改，照出的"不符"可能是设计本身要变） |
+| `closed` | Baseline usable; conclusions may serve as Gate D evidence |
+| `confirm` | May be compared; the report is marked "baseline not frozen", and comparison-type conclusions are for reference only |
+| `draft` / `explore` | Do not refuse, but mark conclusions `reference only`; **must not be used for Gate D sign-off** (the design is still changing, so a "mismatch" found may be something the design itself is about to change) |
 
-## 3 change-list 结构
+## 3 change-list structure
 
-路径形如 `.brainstorming-archify/change-lists/<UTC 时间戳>-<slug>.md`。必须含四段：
+The path looks like `.brainstorming-archify/change-lists/<UTC timestamp>-<slug>.md`. It must contain four sections:
 
-| 段 | 内容 | 用途 |
+| Section | Content | Purpose |
 |---|---|---|
-| `## 讨论记录` | 每轮讨论的起因与范围收敛 | 判断决策背景 |
-| `## 关键决策` | 决策条目（D-nnn 或加粗条目）+ 理由 | A1 决策追溯的**意图源** |
-| `## 文件修改台账` | 文件 / 变更性质 / 涉及章节 / 状态 | 判断哪些文档受影响 |
-| `## 落盘授权` | 用户授权的范围与修正 | 判断改动是否越权 |
+| `## 讨论记录` | Origin and scope convergence of each discussion round | Judge the decision background |
+| `## 关键决策` | Decision entries (D-nnn or bolded entries) + rationale | The **intent source** for A1 decision tracing |
+| `## 文件修改台账` | File / nature of change / sections touched / status | Judge which documents are affected |
+| `## 落盘授权` | Scope authorized by the user and corrections | Judge whether changes exceeded authority |
 
-**决策编号**：若条目带 `D\d+` 编号则直接引用；若无编号（常见），按出现顺序编号为 `D-01..`，并在报告中注明"本轮无显式编号，按序编号"。
+**Decision numbering**: if an entry carries a `D\d+` number, reference it directly; if it has none (common), number them in order of appearance as `D-01..` and note in the report "no explicit numbering this round; numbered by order".
 
-## 4 模板章节表
+## 4 Template section table
 
-固定章节缺失且未写"不适用 + 理由"→ P2（工艺项）。
+A fixed section that is missing, without "N/A + reason" written for it → P2 (craft item).
 
-| 文档 | 必需章节（标题关键词） |
+| Document | Required sections (title keywords) |
 |---|---|
 | `00-接口契约.md` | 总则；1 MySQL 数据表；2 Redis key 与结构；3 MQ 消息通道；4 HTTP 接口；5 gRPC 接口；6 动态库 API；7 TCP 接口；8 其他对外接口；9 跨类别共同约定；10 待定问题与风险 |
 | `01-架构设计.md` | 1 背景与问题；2 目标与非目标；3 方案对比与选型；4 整体功能说明；5 功能点需求说明；6 功能模块划分；7 跨模块接口矩阵；8 核心类设计；9 代码文件树组织；10 全局功能流程；11 业务编排流程；12 运行视图；13 部署视图；14 关键决策记录；15 待定问题与风险 |
 | `02-实体与数据设计.md` | 1 数据模式总览；2 领域类图；3 实体关系图；4 数据流图；5 核心实体状态机；6 数据生命周期与保留；7 关键决策记录；8 待定问题与风险 |
 | `NN-模块.md` | 1 模块职责与边界；2 本模块类清单与关系；3 类详细设计；4 对外依赖契约；5 端到端业务流程；6 本模块实体状态机；7 关键决策记录；8 待定问题与风险 |
 
-## 5 结构特征校验（防 archify 升级导致静默错位）
+## 5 Structural feature validation (guards against silent misalignment caused by archify upgrades)
 
-| 特征 | 校验方式 | 不匹配时 |
+| Feature | How to validate | When it does not match |
 |---|---|---|
-| 文件编号体系 | 正则 `^0\d-` / `^(1\d|\d\d)-`；00/01/02 固定 | 告警 + 列出实际文件名，要求人工确认映射，**停止断言抽取** |
-| 契约章节 | 上表 00 的 10 节是否齐 | 告警（可能模板变了） |
-| 模块章节 | 上表模块 8 节是否齐 | 同上 |
-| state schema | `schema_version/state/files/reopens` 齐否 | 缺任一 → 保守按 draft，告警 |
-| change-list | 是否有「关键决策」段 | 缺失 → A1 标 `skipped` 并说明 |
+| File numbering scheme | Regex `^0\d-` / `^(1\d|\d\d)-`; 00/01/02 fixed | Warn + list the actual file names, require a human-confirmed mapping, **stop assertion extraction** |
+| Contract sections | Are the 10 sections of 00 in the table above all present | Warn (the template may have changed) |
+| Module sections | Are the 8 sections of a module in the table above all present | Same as above |
+| state schema | Are `schema_version/state/files/reopens` complete | Any missing → conservatively treat as draft, warn |
+| change-list | Does it have a "关键决策" section | Missing → mark A1 as `skipped` and explain |
 
-**原则：结构不匹配一律停下来说明。** 只有 `docstat.mjs` 的输出作为证据，不许凭印象判断"差不多"。
+**Principle: any structural mismatch means stop and explain.** Only `docstat.mjs` output counts as evidence; judging "close enough" from impression is forbidden.
 
-## 6 缺失处置
+## 6 Gap disposition
 
-| 缺失 | 处置 |
+| Gap | Disposition |
 |---|---|
-| 00/01/02 任一 | 记 **P1（产物不完整）**，其余项照审 |
-| 模块文档全缺 | 记 P1；D1/D2/D3 只能基于架构文档判定，报告中声明局限 |
-| task.md | 记 **P1（方案列为必需）**；删去"可实现粒度"相关结论 |
-| diagrams/ | 记 P3 |
-| state.yaml | 无法做状态门禁与风险加权；全报告标「基准未冻结」，不得用于 Gate D 放行 |
-| change-lists/ | 决策追溯标 `skipped`，D12 只能按文档内「关键决策记录」章判定 |
+| Any of 00/01/02 | Record **P1 (incomplete artifact)**; review the remaining items as usual |
+| All module documents missing | Record P1; D1/D2/D3 can only be judged from the architecture document; declare the limitation in the report |
+| task.md | Record **P1 (listed as required by the plan)**; drop conclusions about "implementation-ready granularity" |
+| diagrams/ | Record P3 |
+| state.yaml | State gate and risk weighting are impossible; mark the whole report "baseline not frozen" and it must not be used for Gate D sign-off |
+| change-lists/ | Decision tracing marked `skipped`; D12 can only be judged from the "关键决策记录" chapter inside the documents |

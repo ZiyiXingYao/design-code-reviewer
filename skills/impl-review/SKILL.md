@@ -1,147 +1,147 @@
 ---
 name: impl-review
-description: 评审代码实现是否兑现了 brainstorming-archify 的设计，并做通用正确性/安全评审（20 镜头 + DR-1~8 漂移分类 + 五类对照）。有设计则对照，无设计降为 L0 仅代码评审但跑满 19 镜头。触发语：评审代码、实现符合设计吗、合并前检查、review 一下、这个 MR 有没有问题。
+description: Review whether a code implementation fulfills the brainstorming-archify design and run general correctness/security review (20 lenses + DR-1~8 drift classification + five-category cross-check). With a design, compare against it; without one, degrade to L0 code-only review but still run all 19 lenses. Trigger phrases — 评审代码、实现符合设计吗、合并前检查、review 一下、这个 MR 有没有问题。
 ---
 
-# 实现评审（impl）
+# Implementation Review (impl)
 
-对象是**代码**；设计文档是基准。**不评架构合理性**（那是 `design-review` 的事），除非违反设计明文约束。
+The subject is **code**; the design docs are the baseline. **Do not judge architectural soundness** (that is `design-review`'s job) unless a documented design constraint is violated.
 
-`<skill-root>` = 本文件所在目录。
+`<skill-root>` = the directory containing this file.
 
-## 1 铁律
+## 1 Hard Rules
 
-- **B0 基准** — 开跑前判定 L0/L1/L2 并写进报告第 0 节。设计缺失**不阻断**评审，只是降 L0；**L0 绝不许标成 L1/L2**，也不得声称"实现符合设计"。
-- **B1 只读** — 不改任何文件；修复建议落 `task.md`。
-- **B2 范围** — 范围由 `git diff <base>...HEAD` 唯一确定；范围外文件只作上下文（调用点失效除外，标 `cross-file`）。
-- **B3 体检先行** — 子模块未检出时其实现全落 missing，是**假阴性**，不得计入缺陷。
-- **B4 断言** — 每条发现给：文档位置 + 代码位置（file:line）+ 断言原文或触发条件。
-- **B5 三态** — `found / missing / unverifiable`；missing 必须归为「真缺失 / 改名未回写 / 表达差异」。
-- **B6 承诺** — `task.md` 的 `[x]` 必须验证；假勾选 = P0。
-- **B7 不评架构** — 不评模块划分与技术选型。
-- **B8 对抗** — 所有 P0/P1 必须过红-蓝-裁，三轮上下文隔离；"上游应该校验了"= 无效辩护。
+- **B0 Baseline** — Determine L0/L1/L2 before starting and write it into section 0 of the report. A missing design **does not block** the review; it only drops the baseline to L0; **L0 must never be labeled L1/L2**, and you must not claim "the implementation matches the design".
+- **B1 Read-only** — Do not modify any file; remediation suggestions go into `task.md`.
+- **B2 Scope** — Scope is determined solely by `git diff <base>...HEAD`; out-of-scope files are context only (except broken call sites, marked `cross-file`).
+- **B3 Preflight first** — When a submodule is not checked out, its implementation all lands in missing; that is a **false negative** and must not be counted as a defect.
+- **B4 Assertion** — Every finding must give: document location + code location (file:line) + the assertion text or trigger condition.
+- **B5 Three states** — `found / missing / unverifiable`; every missing item must be classified as "truly missing / renamed without write-back / expression difference".
+- **B6 Commitments** — Every `[x]` in `task.md` must be verified; a false checkmark = P0.
+- **B7 No architecture review** — Do not judge module boundaries or technology choices.
+- **B8 Adversarial** — All P0/P1 must pass red-blue-judge with three rounds of context isolation; "upstream should have validated it" = invalid defense.
 
-## 2 流程 B0–B10
+## 2 Pipeline B0–B10
 
-| 步 | 动作 | 产出 | 退出条件 |
+| Step | Action | Output | Exit condition |
 |---|---|---|---|
-| **B0 体检 + 基准** | `preflight.mjs`：子模块、基线 sha、L0/L1/L2 | `preflight.json` | 等级已判定；子模块问题已声明 |
-| **B1 锁范围** | `delta`：`git diff from..to --stat`；`full`：整仓代码（排除 vendor/build/third_party）按设计模块切片 | 范围清单 | 范围固定 |
-| **B1.5 批计划 + 材料路由** | 镜头按批切分 + 每组材料清单 | `plan.json` | 批次数固定 |
-| **B2 锁定设计基准** | `full`：全部 `specs/design`；`delta`：`related-design.mjs` 命中的设计章节 | 基准清单 | 基准就位 |
-| **B3 抽断言** | `claims.mjs` | `claims.json` | 断言数确定 |
-| **B4 机械核对** | 全仓核符号 + 三态归类 | `claims-verify.md` | 三态齐备 |
-| **B5 逐镜头扫描** | `smells.mjs` 出信号 → 20 镜头深读 | 原始发现 | 20 镜头全有结论 |
-| **B5.5 五类对照** | 结构/行为/需求/约束/验收逐类落到批与报告 §1 | 覆盖表 | 五类均有结论 |
-| **B6 承诺核验** | task.md 四段 + 负向约束 diff | 承诺核对表 | 每条 `[x]` 有结论 |
-| **B6.5 去重合并** | 同位置同机制合并；同机制跨位置归并 | 唯一发现集 | 必须在对抗之前 |
-| **B7a/b/c 红-蓝-裁** | 子代理执行 | 06/07/08.json | 无折中结论 |
-| **B8 定级成文** | 11 节报告；§7 的 P0/P1 逐条四段式 | `REPORT.md` | gate G20 通过 |
-| **B9 收口 + 交付** | `SUMMARY.md` + gate，再把 REPORT/SUMMARY 交付到 `specs/audit/<id>/` | 2 页说明书 + 交付目录 2 件 | gate 通过；交付目录 2 件与工作副本一致 |
-| **B10 人工评审 + task.md** | 把**已交付的成品**交人评审；批准后生成修复任务清单并关闭 | `task.md` | `approve` 成功，状态 `closed` |
+| **B0 Preflight + baseline** | `preflight.mjs`: submodules, baseline sha, L0/L1/L2 | `preflight.json` | Level decided; submodule issues declared |
+| **B1 Lock scope** | `delta`: `git diff from..to --stat`; `full`: whole-repo code (excluding vendor/build/third_party) sliced by design module | scope list | Scope frozen |
+| **B1.5 Batch plan + material routing** | split lenses into batches + material list per group | `plan.json` | Batch count fixed |
+| **B2 Lock design baseline** | `full`: all of `specs/design`; `delta`: design sections matched by `related-design.mjs` | baseline list | Baseline in place |
+| **B3 Extract assertions** | `claims.mjs` | `claims.json` | Assertion count fixed |
+| **B4 Mechanical verification** | resolve symbols repo-wide + three-state classification | `claims-verify.md` | All three states covered |
+| **B5 Lens scan** | `smells.mjs` emits signals → deep read with the 20 lenses | raw findings | All 20 lenses concluded |
+| **B5.5 Five-category cross-check** | structure/behavior/requirement/constraint/acceptance each mapped to batches and to report §1 | coverage table | All five categories concluded |
+| **B6 Commitment verification** | task.md four sections + negative-constraint diff | commitment checklist | Every `[x]` concluded |
+| **B6.5 Deduplicate & merge** | merge same location + same mechanism; consolidate same mechanism across locations | unique finding set | Must happen before the adversarial stage |
+| **B7a/b/c red-blue-judge** | executed by sub-agents | 06/07/08.json | No compromise verdicts |
+| **B8 Grade & write up** | 11-section report; every P0/P1 in §7 written in four parts | `REPORT.md` | gate G20 passed |
+| **B9 Close out + deliver** | `SUMMARY.md` + gate, then deliver REPORT/SUMMARY into `specs/audit/<id>/` | 2-page brief + 2 files in the delivery dir | gate passed; the 2 files in the delivery dir match the working copies |
+| **B10 Human review + task.md** | hand the **delivered artifacts** to a human reviewer; after approval generate the remediation task list and close | `task.md` | `approve` succeeded, state `closed` |
 
-## 3 基准等级
+## 3 Baseline Levels
 
-| 等级 | 条件 | 门禁效力 |
+| Level | Condition | Gate effect |
 |---|---|---|
-| **L2** | 设计齐全 + `state=closed` | 可作放行依据 |
-| **L1** | 设计齐全但未冻结（state≠closed） | 可作门禁，注明基准未冻结 |
-| **L0** | 无设计 / draft·explore / 仅部分文档 / 只改代码 | **不作放行依据** |
+| **L2** | Design complete + `state=closed` | Valid as release basis |
+| **L1** | Design complete but not frozen (state≠closed) | Valid as a gate, with a note that the baseline is not frozen |
+| **L0** | No design / draft·explore / only partial docs / code-only changes | **Not valid as release basis** |
 
-- L0 是完整评审：镜头 1–20 全跑；**镜头 0 跳过并标注**（不许用代码反推需求）。
-- 用户可传 `--require-design`：产物不全时 `preflight.mjs` 拒绝运行并写 `preflight-failed.md`。
-- 设计基准只来自 `specs/design/` 与 archify `state.yaml`：**不读、不继承** design-review 的任何结论或交接块。
+- L0 is a full review: lenses 1–20 all run; **lens 0 is skipped and marked** (never reverse-engineer requirements from code).
+- The user may pass `--require-design`: when artifacts are incomplete `preflight.mjs` refuses to run and writes `preflight-failed.md`.
+- The design baseline comes only from `specs/design/` and archify `state.yaml`: **never read or inherit** any conclusion or handoff block from design-review.
 
-## 4 五类对照（缺任一类都不算"对照过设计"）
+## 4 Five-Category Cross-Check (missing any category means the design was not cross-checked)
 
-**执行绑定**：结构/行为对照在 B5 镜头扫描前由 S1/S2 组完成；需求/约束/验收在 B6 承诺核验完成；五类结果写入报告 §1 覆盖表。
+**Execution binding**: structure/behavior cross-checks are done by groups S1/S2 before the B5 lens scan; requirement/constraint/acceptance are done during B6 commitment verification; all five results go into the report §1 coverage table.
 
-| # | 类型 | 设计侧来源 | 代码侧核对 | 对不上算 |
+| # | Category | Design-side source | Code-side check | Mismatch = |
 |---|---|---|---|---|
-| 1 | 结构 | 契约清单表、类清单、文件树 | schema、类定义、目录 | DR-1（代码有文档无只记 DR-6 提示） |
-| 2 | 行为 | 流程章节、状态机、时序图 | 分支、状态枚举、调用链 | DR-3 |
-| 3 | 需求 | task.md `[实现的功能]` | 代码改动位置 | P1 |
-| 4 | 约束 | task.md `[实现的约束]`、D-nnn | diff 检查被禁改动 | **P0** |
-| 5 | 验收 | task.md `[验收标准]` | `test/` 对应用例 | **P0（假勾选）** |
+| 1 | Structure | contract list table, class list, file tree | schema, class definitions, directories | DR-1 (code has it, doc does not — record only as a DR-6 note) |
+| 2 | Behavior | flow sections, state machine, sequence diagram | branches, state enums, call chains | DR-3 |
+| 3 | Requirement | task.md `[实现的功能]` | code change locations | P1 |
+| 4 | Constraint | task.md `[实现的约束]`, D-nnn | diff check for forbidden changes | **P0** |
+| 5 | Acceptance | task.md `[验收标准]` | corresponding cases in `test/` | **P0 (false checkmark)** |
 
-## 5 20 镜头
+## 5 The 20 Lenses
 
-| Pass | 镜头 |
+| Pass | Lens |
 |---|---|
-| A 功能 | 00 需求–实现映射 |
-| B 正确性 | 01 生命周期 / 02 并发 / 03 资源 / 04 错误 / 05 状态机 / 06 边界 / 07 时间 / 08 契约序列化 / 09 一致性 |
-| C 安全 | 10 信任边界 / 11 身份越权 / 12 内存安全 / 13 不可信解析 / 14 机密依赖 / 15 拒绝服务 |
-| D 工程性 | 16 性能 / 17 可观测 / 18 测试 / 19 抽象与模式 / 20 并发落地 |
+| A Functionality | 00 requirement–implementation mapping |
+| B Correctness | 01 lifecycle / 02 concurrency / 03 resources / 04 errors / 05 state machine / 06 boundaries / 07 time / 08 contract serialization / 09 consistency |
+| C Security | 10 trust boundary / 11 identity and privilege escalation / 12 memory safety / 13 untrusted parsing / 14 secrets and dependencies / 15 denial of service |
+| D Engineering | 16 performance / 17 observability / 18 testing / 19 abstraction and patterns / 20 concurrency in practice |
 
-**镜头 19/20 信号驱动**：先跑 `smells.mjs`，只对命中位置深读；没有信号就不报。
-- 镜头 19 的模式类发现**封顶 P2**；"缺统一抽象已在多处复制同一缺陷"可 P1。
-- 镜头 20 违反 CONC-1..5 最低 P1、致故障可 P0；CONC-6/7 为 P2。
-- 并发结论拿不出 TSan/Helgrind 等证据时置信度 ≤medium，不得单独作 P0。
+**Lenses 19/20 are signal-driven**: run `smells.mjs` first, deep-read only the hit locations; if there is no signal, do not report.
+- Pattern-class findings from lens 19 are **capped at P2**; "the same defect is duplicated in several places because a shared abstraction is missing" may be P1.
+- Lens 20: violating CONC-1..5 is at least P1, and may be P0 if it causes failure; CONC-6/7 are P2.
+- Without TSan/Helgrind-class evidence, concurrency conclusions carry confidence ≤medium and must not stand alone as P0.
 
-判据细节见 `lenses/`（按需加载）。
+Criteria details are in `lenses/` (load on demand).
 
-## 6 漂移分类
+## 6 Drift Classification
 
-DR-1 无实现 / DR-2 改名未回写 / DR-3 行为不符 / DR-4 残留 / DR-5 内部矛盾 / DR-6 设计缺口（只记提示，不计缺陷）/ DR-7 模板不合规 / DR-8 承诺未兑现。
-级别与判据见 `drift.md`。**DR-8 = P0**。
+DR-1 no implementation / DR-2 renamed without write-back / DR-3 behavior mismatch / DR-4 residue / DR-5 internal contradiction / DR-6 design gap (note only, not counted as a defect) / DR-7 template non-compliance / DR-8 commitment unfulfilled.
+See `drift.md` for levels and criteria. **DR-8 = P0**.
 
-## 7 状态与落盘
+## 7 State and Artifacts
 
 ```
-# 先开一轮，拿到 reviewDir（<projectRoot>/.design-code-reviewer/<YYYY-MM-DD>-impl/）
+# start a round first to get reviewDir (<projectRoot>/.design-code-reviewer/<YYYY-MM-DD>-impl/)
 node <skill-root>/scripts/state.mjs init <projectRoot> --type impl --plan <plan.json> [--mode delta --from <rev> --to <rev>|--mode full] [--bench L2] [--id <id>]
 
 node <skill-root>/scripts/preflight.mjs <projectRoot> [--require-design] --out <reviewDir>
-node <skill-root>/scripts/related-design.mjs <projectRoot> --from <rev> --to <rev> --out <reviewDir>   # 仅 delta
+node <skill-root>/scripts/related-design.mjs <projectRoot> --from <rev> --to <rev> --out <reviewDir>   # delta only
 node <skill-root>/scripts/claims.mjs <projectRoot> --out <reviewDir>/claims.json [--design-scope <reviewDir>/design-scope.json]
 node <skill-root>/scripts/smells.mjs <projectRoot> --json --out <reviewDir>/smells.json
 node <skill-root>/scripts/state.mjs batch <reviewDir> --payload <b01.json> --agent sub-a01
 node <skill-root>/scripts/state.mjs partial <reviewDir> --batch b08 --payload <part.json>
 node <skill-root>/scripts/gate.mjs <reviewDir>
-node <skill-root>/scripts/state.mjs transition <reviewDir> reported --reason "B9 完成"   # 自动交付 REPORT/SUMMARY 到 specs/audit/<id>/
-node <skill-root>/scripts/state.mjs deliver <reviewDir>        # 报告修订后重新交付，供人工评审
-node <skill-root>/scripts/state.mjs approve <reviewDir> --reviewer "<姓名>" [--note "…"] [--include-p2]
-node <skill-root>/scripts/ledger.mjs <projectRoot> sync <reviewDir>     # approve 会自动执行
+node <skill-root>/scripts/state.mjs transition <reviewDir> reported --reason "B9 complete"   # auto-delivers REPORT/SUMMARY into specs/audit/<id>/
+node <skill-root>/scripts/state.mjs deliver <reviewDir>        # re-deliver after the report is revised, for human review
+node <skill-root>/scripts/state.mjs approve <reviewDir> --reviewer "<name>" [--note "…"] [--include-p2]
+node <skill-root>/scripts/ledger.mjs <projectRoot> sync <reviewDir>     # approve runs this automatically
 
-# 中断恢复
+# interrupt recovery
 node <skill-root>/scripts/resume.mjs <projectRoot> --list
 node <skill-root>/scripts/resume.mjs <projectRoot> [--id <id>] [--json]
 ```
 
-权威顺序：`batches/*.json` > `progress.log` > `state.yaml`。批写入走 `tmp→fsync→rename`。
-gate 不通过不许出报告（只能标 `DRAFT`），也不许 approve。进入 `reported` 即自动交付 REPORT/SUMMARY，人工评审的对象是交付目录里的成品；批准后 `closed`，工作目录只读。
-请人评审时必须报出交付目录路径、已落地文件清单，并说明 `task.md` 待批准后生成。
+Order of authority: `batches/*.json` > `progress.log` > `state.yaml`. Batch writes go through `tmp→fsync→rename`.
+If the gate fails, no report may be issued (only mark `DRAFT`), and no approve is allowed. Entering `reported` auto-delivers REPORT/SUMMARY; the subject of human review is the artifact in the delivery directory; after approval it becomes `closed` and the working directory is read-only.
+When asking for human review you must report the delivery directory path, the list of files placed there, and state that `task.md` will be generated after approval.
 
-覆盖下限：impl 标准档 20 镜头（quick 5）；低于下限时 gate 拒绝，除非显式豁免。跨次账本在 `.design-code-reviewer/ledger.yaml`。
-两种模式：`delta`（默认）审 `--from..--to` 的代码变更，并对照变更涉及的设计章节；`full` 审整仓代码、对照全部设计文档。
-G20 报告自包含：P0/P1 每条须有独立小节且含「在哪 / 什么问题 / 怎么改」，位置必须是代码 `file:line` 并给设计对照；`05-findings.json` 是证据库，不能替报告正文。
-G24 性能与平衡：报告必须有「性能与容量」小节（性能结论 / 容量与上限 / 时延与热点 / 平衡结论）。镜头 16 的性能发现必须带量级或复杂度，优化建议必须写代价；**无量化依据的优化不算缺陷（最多 P3 提示）**，不得为性能牺牲可读性或引入无必要的并发/池化。
+Coverage floor: impl standard tier runs 20 lenses (quick tier 5); below the floor the gate refuses unless explicitly waived. The cross-run ledger lives at `.design-code-reviewer/ledger.yaml`.
+Two modes: `delta` (default) reviews the code changes in `--from..--to` and compares against the design sections those changes touch; `full` reviews the whole repo against all design docs.
+G20 report self-containment: every P0/P1 must have its own subsection covering "where / what is wrong / how to fix"; the location must be code `file:line` with a design cross-reference; `05-findings.json` is the evidence store and cannot replace the report body.
+G24 performance and balance: the report must have a "Performance and Capacity" section (performance conclusion / capacity and limits / latency and hot spots / balance conclusion). Performance findings from lens 16 must carry magnitude or complexity, and optimization advice must state its cost; **an optimization without quantitative evidence is not a defect (at most a P3 note)**, and readability must not be sacrificed for performance, nor unnecessary concurrency/pooling introduced.
 
-中间产物在 `.design-code-reviewer/<YYYY-MM-DD>-impl/`；成品放 `specs/audit/<YYYY-MM-DD>-impl/`：`reported` 时先就位 `REPORT.md`、`SUMMARY.md`，`task.md` 由人工批准后按 P0/P1 生成，依赖排序、四段式提示词。
+Intermediate artifacts live in `.design-code-reviewer/<YYYY-MM-DD>-impl/`; final artifacts go to `specs/audit/<YYYY-MM-DD>-impl/`: at `reported` time `REPORT.md` and `SUMMARY.md` are placed there first, and `task.md` is generated from P0/P1 after human approval, dependency-ordered, with four-part prompts.
 
-## 7.5 子代理前置
+## 7.5 Sub-Agent Prerequisite
 
-若宿主**不具备子代理分派能力**，直接拒绝运行并说明原因——不退回单 agent 模拟。
+If the host **lacks sub-agent dispatch capability**, refuse to run and explain why — do not fall back to simulating with a single agent.
 
-## 8 对抗
+## 8 Adversarial
 
-与 `design-review` 同一套机制（`adversarial/orchestrator.md`）：扫描层按镜头组并行（7 组：S1 结构 / S2 状态 / S3 执行 / S4 边界 / S5 安全 / S6 工程 / S7 横切），对抗层 red→blue→judge 串行，只对 P0/P1。
-红队弹药：20 镜头触发条件、信任边界表、恶意输入、并发交错序列、负向约束检查。
-所有 P0/P1 需在 `08-verdict.json` 有裁断；折中结论 → gate 拒绝。
+Same mechanism as `design-review` (`adversarial/orchestrator.md`): the scanning layer runs lens groups in parallel (7 groups: S1 structure / S2 state / S3 execution / S4 boundaries / S5 security / S6 engineering / S7 cross-cutting); the adversarial layer runs red→blue→judge serially, for P0/P1 only.
+Red-team ammunition: 20 lens trigger conditions, trust boundary table, malicious inputs, concurrent interleaving sequences, negative-constraint checks.
+Every P0/P1 needs a verdict in `08-verdict.json`; a compromise conclusion → the gate refuses.
 
-## 9 档位
+## 9 Tiers
 
-| 档位 | 适用 | 镜头 | 对抗 | 时长 |
+| Tier | Use | Lenses | Adversarial | Duration |
 |---|---|---|---|---|
-| 快速 | commit 前自查、hotfix | 1/2/4/6/10 | 不做 | 5–8 分钟 |
-| 标准（默认） | 合并 MR 前 | 全 20 + 跑一次 lint/test 作证据 | 仅 P0/P1 | 25–30 分钟（估算） |
-| 深度 | 发版前、并发/协议改动 | 全量 + TSan/静态分析 | 全量 + 升级轮 | 1–2 小时 |
+| Quick | pre-commit self-check, hotfix | 1/2/4/6/10 | none | 5–8 minutes |
+| Standard (default) | before merging an MR | all 20 + one lint/test run as evidence | P0/P1 only | 25–30 minutes (estimate) |
+| Deep | pre-release, concurrency/protocol changes | full + TSan/static analysis | full + escalation rounds | 1–2 hours |
 
-快速档不产出 L1/L2 结论，最多标 `L0（快速档）`；跳过项必须记 `skipped + reason`。档位在 B1.5 写进 `plan.json`，运行中不许改。
+The quick tier does not produce L1/L2 conclusions; at most it marks `L0 (quick tier)`; skipped items must be recorded as `skipped + reason`. The tier is written into `plan.json` at B1.5 and must not change during the run.
 
-## 10 边界
+## 10 Boundaries
 
-- 不评架构合理性、技术选型（Gate D 的事）。
-- L0 通过 ≠ 功能实现了需求——它只代表代码内部自洽、没查出这类缺陷。
-- **设计未覆盖不算错**：代码里有、设计文档没写的实现，记「设计缺口」提示（报告 §5），不计 P0–P2、不进对抗、不进 task.md。只有"文档写了、代码没做"（DR-1）才算缺陷。
-- 不保证抓全缺陷；保证的是漏了什么你能看见（覆盖矩阵、未核对项）。
+- Do not judge architectural soundness or technology choices (that is Gate D's job).
+- Passing at L0 ≠ the feature meets requirements — it only means the code is internally consistent and this class of defect was not found.
+- **A design gap is not an error**: implementations that exist in code but are not written in the design docs are recorded as a "design gap" note (report §5), not counted as P0–P2, not sent to adversarial, not written into task.md. Only "the doc says it, the code does not do it" (DR-1) counts as a defect.
+- No guarantee of catching every defect; the guarantee is that whatever was missed is visible (coverage matrix, unverified items).

@@ -2,44 +2,44 @@
 
 ## Purpose
 
-定义设计评审与实现评审中的性能评审范围，以及性能结论必须遵守的平衡约束：性能不得以可读性和实现复杂度为代价，也不得无依据地复杂化。
+Defines the performance review scope within design review and implementation review, and the balance constraints that any performance conclusion must respect: performance must not come at the cost of readability or implementation complexity, and must not be complicated without evidence.
 
 ## Requirements
 
-### Requirement: 设计侧容量四问
+### Requirement: Four capacity questions on the design side
 
-系统 SHALL 在 D9 逐条回答四项，缺任一项判不合格：峰值推导（实体数 × 频率 + 管理面流量，与声明峰值比对）、内存预算分解、队列条数+字节上限与满行为、P99 目标与热点路径复杂度。
+The system SHALL answer all four items one by one in D9; missing any one of them fails the check: peak derivation (entity count × frequency + management-plane traffic, compared against the declared peak), memory budget breakdown, queue count + byte cap with full-queue behavior, and the P99 target with hot-path complexity.
 
-#### Scenario: 推导缺失
+#### Scenario: derivation missing
 
-- **WHEN** 文档只给"支持 N 台 / 峰值 M msg/s"而没有推导式
-- **THEN** D9 不合格，记 P1
+- **WHEN** the document only states "supports N nodes / peak M msg/s" without a derivation
+- **THEN** D9 fails and is recorded as P1
 
-#### Scenario: 推导自相矛盾
+#### Scenario: self-contradictory derivation
 
-- **WHEN** 按文档自己给出的台数与频率算出的峰值显著高于声明峰值，且分片/线程数按声明峰值定标
-- **THEN** 容量结论整体失效，记 P0
+- **WHEN** the peak computed from the document's own node count and frequency is significantly higher than the declared peak, and shards/threads are sized against the declared peak
+- **THEN** the capacity conclusion is void and is recorded as P0
 
-### Requirement: 实现侧性能发现必须量化
+### Requirement: Implementation-side performance findings must be quantified
 
-系统 SHALL 要求镜头 16 的每条性能发现给出量级估算或复杂度；给不出时最多 P3 提示，不得进入 P0/P1。
+The system SHALL require every performance finding from lens 16 to give an order-of-magnitude estimate or a complexity; when it cannot, the finding is at most a P3 advisory and must not enter P0/P1.
 
-#### Scenario: 无量化证据
+#### Scenario: no quantified evidence
 
-- **WHEN** 发现仅写"此处可能较慢 / 建议加缓存"而没有量级或复杂度
-- **THEN** 不作为缺陷，最多记 P3 提示
+- **WHEN** a finding only says "this may be slow / consider adding a cache" without an order of magnitude or complexity
+- **THEN** it is not treated as a defect and is at most a P3 advisory
 
-### Requirement: 性能与可读性、实现代价平衡
+### Requirement: Balance between performance, readability and implementation cost
 
-系统 SHALL 要求每条性能优化建议同时给出代价（可读性、实现复杂度、维护成本），并优先选择同等收益下更简单的实现。
+The system SHALL require every performance optimization recommendation to state its cost (readability, implementation complexity, maintenance cost), and to prefer the simpler implementation at equal benefit.
 
-#### Scenario: 无依据的复杂化
+#### Scenario: unjustified complication
 
-- **WHEN** 在低负载或瓶颈未定位时建议引入无锁、池化、批处理、复杂并发拓扑
-- **THEN** 按过度设计记 P2，不得作为 P0/P1
-- **AND** 不得因优化要求压缩命名、分层或错误处理
+- **WHEN** lock-free structures, pooling, batching or complex concurrency topologies are recommended under low load or before the bottleneck is located
+- **THEN** it is recorded as P2 over-engineering and must not be P0/P1
+- **AND** naming, layering or error handling must not be compressed for the sake of optimization
 
-#### Scenario: 报告性能小节
+#### Scenario: performance section in the report
 
-- **WHEN** 标准或深度档出具报告
-- **THEN** 必须有「性能与容量」小节，含性能结论 / 容量与上限 / 时延与热点 / 平衡结论四项（gate G24）
+- **WHEN** a report is issued at the standard or deep profile
+- **THEN** it must contain a "性能与容量" (performance and capacity) section with four items: performance conclusion / capacity and limits / latency and hot paths / balance conclusion (gate G24)

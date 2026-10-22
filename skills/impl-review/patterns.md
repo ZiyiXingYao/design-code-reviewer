@@ -1,56 +1,56 @@
-# 设计模式参照表（GoF 23）
+# Design Pattern Reference (GoF 23)
 
-**不是必查清单**。只有两个用法：反查（先信号后查表）与正查（先看用的模式再看误用）。
+**Not a mandatory checklist.** Only two uses: reverse lookup (signal first, then consult the table) and forward lookup (see which pattern is used, then look for misuse).
 
-## 反查：信号 → 缺的模式
+## Reverse Lookup: Signal → Missing Pattern
 
-| 信号（可观测） | 缺的模式 | 判据 |
+| Signal (observable) | Missing pattern | Criterion |
 |---|---|---|
-| 同一维度类型分支 ≥3 处重复，分支集相同 | Strategy / 多态分派 | 新增一类要改 N 处 |
-| 状态用字符串/整数散落判断 | State | 状态值分散 ≥3 文件 |
-| 手工维护回调列表 ≥2 处 | Observer | 发布方需知道订阅者 |
-| 构造参数 ≥7 或 bool ≥3 | Builder / 参数对象 | 调用点顺序易错 |
-| 资源获取/释放散落 ≥3 处 | RAII / 模板方法 | 存在漏释放 |
-| 调用方按固定顺序调 5+ 对象 | Facade | 顺序靠文档约定 |
-| 横切逻辑散落调用点 | Proxy / Decorator | 同类前置代码重复 |
-| 两个维度独立变化 | Bridge | 组合数 = 维度乘积 |
-| 稳定结构上频繁加操作 | Visitor | 加操作要改所有类 |
-| 第三方接口与内部不匹配 | Adapter | 转换代码重复 |
+| Type branching on the same dimension repeated ≥3 times with an identical branch set | Strategy / polymorphic dispatch | adding one type means changing N places |
+| State decided by scattered string/int checks | State | state values spread across ≥3 files |
+| Hand-maintained callback list in ≥2 places | Observer | the publisher has to know its subscribers |
+| ≥7 constructor parameters or ≥3 bools | Builder / parameter object | call-site ordering is error-prone |
+| Resource acquire/release scattered across ≥3 places | RAII / Template Method | leaks exist |
+| Caller invokes 5+ objects in a fixed order | Facade | ordering relies on documented convention |
+| Cross-cutting logic scattered across call sites | Proxy / Decorator | the same pre/post code repeats |
+| Two dimensions vary independently | Bridge | combinations = product of the dimensions |
+| Frequent new operations on a stable structure | Visitor | adding an operation touches every class |
+| Third-party interface does not match the internal one | Adapter | conversion code is duplicated |
 
-## 正查：23 种模式的典型误用
+## Forward Lookup: Typical Misuse of the 23 Patterns
 
-统一判据：**实现数 = 1 且无变化预期 → 过度设计（P2）**。
+Unified criterion: **implementation count = 1 with no expected variation → over-engineering (P2)**.
 
-| # | 模式 | 适用信号 | 典型误用 |
+| # | Pattern | Applicable signal | Typical misuse |
 |---|---|---|---|
-| 1 | Abstract Factory | 多产品族整套切换 | 只有一个产品族 |
-| 2 | Builder | 参数 ≥7 或组合爆炸 | 两三个字段也 Builder |
-| 3 | Factory Method | 多个子类各建不同产品 | 只有一个子类 |
-| 4 | Prototype | 克隆比构造便宜 | 简单值对象也 clone |
-| 5 | Singleton | 确实唯一且受控 | 当全局变量用 |
-| 6 | Adapter | 接口不匹配 | 无转换只为包壳 |
-| 7 | Bridge | 两维独立变化 | 只有一个维度 |
-| 8 | Composite | 树形且叶枝一致 | 只有一层 |
-| 9 | Decorator | 动态叠加职责 | 包装层只透传 |
-| 10 | Facade | 简化子系统调用 | Facade 变上帝类 |
-| 11 | Flyweight | 大量重复不可变对象 | 对象本来就少 |
-| 12 | Proxy | 控制访问/延迟加载 | 代理里塞业务 |
-| 13 | Chain of Responsibility | 多个可选处理 | 链只有一环 |
-| 14 | Command | 排队/撤销/留痕 | 无队列无撤销 |
-| 15 | Interpreter | 小型文法 | 当通用表达式引擎 |
-| 16 | Iterator | 多种遍历/隐藏结构 | 容器已有遍历 |
-| 17 | Mediator | N×N 交互 | Mediator 变上帝对象 |
-| 18 | Memento | 快照与恢复 | 快照巨大不压缩 |
-| 19 | Observer | 一对多通知 | 只有一个订阅者 |
-| 20 | State | 状态驱动行为 | 两状态无转移 |
-| 21 | Strategy | 可替换算法 | 只有一个实现的策略 |
-| 22 | Template Method | 骨架固定步骤可变 | 骨架只有一个实现 |
-| 23 | Visitor | 稳定结构扩展操作 | 结构不稳定（双爆炸） |
+| 1 | Abstract Factory | switching a whole product family set | only one product family |
+| 2 | Builder | ≥7 parameters or combinatorial explosion | Builder for two or three fields |
+| 3 | Factory Method | several subclasses each creating a different product | only one subclass |
+| 4 | Prototype | cloning is cheaper than constructing | clone on simple value objects |
+| 5 | Singleton | genuinely unique and controlled | used as a global variable |
+| 6 | Adapter | interface mismatch | no conversion, just a wrapper |
+| 7 | Bridge | two dimensions vary independently | only one dimension |
+| 8 | Composite | tree structure with uniform leaves and branches | only one level |
+| 9 | Decorator | dynamically stacking responsibilities | wrapper layers that only pass through |
+| 10 | Facade | simplifying subsystem calls | Facade becomes a god class |
+| 11 | Flyweight | many repeated immutable objects | objects are few to begin with |
+| 12 | Proxy | access control / lazy loading | business logic stuffed into the proxy |
+| 13 | Chain of Responsibility | multiple optional handlers | a chain of one link |
+| 14 | Command | queueing / undo / audit trail | no queue, no undo |
+| 15 | Interpreter | a small grammar | used as a general expression engine |
+| 16 | Iterator | multiple traversals / hidden structure | the container already traverses |
+| 17 | Mediator | N×N interactions | Mediator becomes a god object |
+| 18 | Memento | snapshot and restore | huge snapshots that are never compressed |
+| 19 | Observer | one-to-many notification | only one subscriber |
+| 20 | State | state-driven behavior | two states with no transitions |
+| 21 | Strategy | interchangeable algorithms | a strategy with a single implementation |
+| 22 | Template Method | fixed skeleton, variable steps | a skeleton with a single implementation |
+| 23 | Visitor | extending operations on a stable structure | unstable structure (double explosion) |
 
-## 判定规则
+## Decision Rules
 
-1. 该用没用：信号成立才报，**封顶 P2**。
-2. 用了用错：结构不完整（策略一个分支、观察者一个订阅者），P2。
-3. 过度设计：实现数 = 1 且无变化预期，P2；必须报，否则会鼓励过度抽象。
+1. Should have been used but was not: report only when the signal holds, **capped at P2**.
+2. Used but wrong: incomplete structure (a strategy with one branch, an observer with one subscriber), P2.
+3. Over-engineering: implementation count = 1 with no expected variation, P2; it must be reported, otherwise it encourages over-abstraction.
 
-模式层面的发现**不产生 P0/P1**；若模式误用已导致实际缺陷，归入对应镜头单独定级。
+Pattern-level findings **never produce P0/P1**; if a pattern misuse has already caused a real defect, assign it to the corresponding lens and grade it there.

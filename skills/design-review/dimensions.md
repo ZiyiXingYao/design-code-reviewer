@@ -1,178 +1,178 @@
-# 15 个设计维度（判据一）
+# The 15 design dimensions (criterion one)
 
-顺序：先判"对不对"（D1–D13），再判并发与抽象（D14–D15）。
-本表与语言、行业无关；语言/行业专属检查点只能追加在 `profiles/`，且不得修改本表的级别上限。
+Order: first judge "is it right" (D1–D13), then judge concurrency and abstraction (D14–D15).
+This table is independent of language and industry; language/industry-specific checkpoints may only be appended in `profiles/`, and must not modify the level caps of this table.
 
-**用法**：逐维度过，每维度必须给出「合格 / 不合格（问题清单）/ 不适用（理由）」，不许留空。
-合格要指到章节；不合格要能写成反例（见 findings.md）。
+**Usage**: walk dimension by dimension; each dimension must yield "pass / fail (issue list) / N/A (reason)". Leaving a row empty is not allowed.
+A pass must point to a section; a fail must be expressible as a counterexample (see findings.md).
 
 ---
 
-## D1 需求覆盖
+## D1 Requirement coverage
 
-- **检查点**：功能点清单每条是否有承接模块；每个模块能否指回功能点；有无孤儿功能点/孤儿模块。
-- **不合格判据**：功能点无模块承接；两个模块都声明负责同一功能且未划界；模块存在但无需求来源。
-- **典型反例形态**：某功能点在需求清单里有，模块划分里找不到归属，实际落在别的模块却没写。
+- **Checkpoints**: does every feature point in the list have an owning module; can every module point back to a feature point; are there orphan feature points / orphan modules.
+- **Fail criteria**: a feature point has no owning module; two modules both claim the same feature with no boundary drawn; a module exists with no requirement source.
+- **Typical counterexample shape**: a feature point is in the requirement list, has no place in the module breakdown, and in practice lands in some other module without being written down.
 
-## D2 模块划分
+## D2 Module decomposition
 
-- **检查点**：职责能否一句话说清；粒度是否均衡；命名是否等于职责；有无重叠。
-- **不合格判据**：两模块职责重叠无边界；一个模块同时承担横切与领域职责；某模块规模远超同类。
-- **典型反例形态**：两个模块都能改同一份数据，边界靠人记。
+- **Checkpoints**: can the responsibility be stated in one sentence; is granularity balanced; does the name equal the responsibility; is there overlap.
+- **Fail criteria**: two modules' responsibilities overlap with no boundary; one module carries both cross-cutting and domain responsibilities; one module is far larger than its peers.
+- **Typical counterexample shape**: two modules can both modify the same data, and the boundary is kept only in people's heads.
 
-## D3 依赖方向
+## D3 Dependency direction
 
-- **检查点**：分层是否成立；有无环；核心层是否依赖基础设施细节。
-- **不合格判据**：存在环；被依赖方反向依赖上游；核心模块绕过统一访问层直连存储。
-- **典型反例形态**：业务模块直接拼 SQL / 直连缓存，绕过统一访问层。
+- **Checkpoints**: does layering hold; are there cycles; does the core layer depend on infrastructure details.
+- **Fail criteria**: a cycle exists; a depended-upon party depends back on upstream; a core module bypasses the unified access layer and talks to storage directly.
+- **Typical counterexample shape**: a business module assembles SQL / connects to cache directly, bypassing the unified access layer.
 
-## D4 接口契约
+## D4 Interface contract
 
-- **检查点**：幂等、超时、错误语义、批量语义、版本兼容、字段归属。
-- **不合格判据**：批量接口未定义部分失败；错误只分成功/失败；字段在两端都声明归属。
-- **典型反例形态**：批量删除第 3 条失败时，前 2 条是否回滚未定义。
+- **Checkpoints**: idempotency, timeout, error semantics, batch semantics, version compatibility, field ownership.
+- **Fail criteria**: a batch interface does not define partial failure; errors are only success/failure; a field is declared as owned on both sides.
+- **Typical counterexample shape**: when item 3 of a batch delete fails, whether the first 2 are rolled back is undefined.
 
-## D5 数据模型
+## D5 Data model
 
-- **检查点**：实体完整、主键/唯一键、状态字段枚举、软删除、多租户、生命周期。
-- **不合格判据**：状态字段无枚举约束；缺审计列；无过期/归档策略。
-- **典型反例形态**：状态是自由字符串靠约定取值；无最后修改人与时间。
+- **Checkpoints**: complete entities, primary/unique keys, state-field enumerations, soft delete, multi-tenancy, lifecycle.
+- **Fail criteria**: a state field has no enumeration constraint; audit columns are missing; no expiry/archival policy.
+- **Typical counterexample shape**: state is a free-form string whose values are upheld by convention; no last-modified-by or last-modified-at.
 
-## D6 状态机
+## D6 State machine
 
-- **检查点**：状态完备、转移合法、终态唯一、超时/取消路径、幂等重入。
-- **不合格判据**：只画主路径；缺取消/超时转移；终态可被再次进入。
-- **典型反例形态**：只设计正常流程的三个状态，"执行中收到取消"没有转移。
+- **Checkpoints**: complete states, legal transitions, unique terminal state, timeout/cancel paths, idempotent re-entry.
+- **Fail criteria**: only the main path is drawn; cancel/timeout transitions are missing; a terminal state can be entered again.
+- **Typical counterexample shape**: only the three states of the happy path are designed; "cancel received while running" has no transition.
 
-## D7 并发与一致性
+## D7 Concurrency and consistency
 
-- **检查点**：谁是状态权威；锁粒度与顺序；跨服务事务；消息重复/乱序；最终一致保证。
-- **不合格判据**：两个服务都写同一状态；以"消息不会重复"为前提；无收敛机制。
-- **典型反例形态**：状态既写本地又写缓存，谁是权威没定义。
+- **Checkpoints**: who is the authority for state; lock granularity and ordering; cross-service transactions; message duplication/reordering; eventual-consistency guarantees.
+- **Fail criteria**: two services both write the same state; assumes "messages will not be duplicated"; no convergence mechanism.
+- **Typical counterexample shape**: state is written both locally and to cache, and who is authoritative is undefined.
 
-## D8 可靠性与容错
+## D8 Reliability and fault tolerance
 
-- **检查点**：失败路径、重试上限与退避、死信、降级、重启恢复、单点。
-- **不合格判据**：只说重试无上限/无死信/无幂等前提；无降级开关；无重启恢复清单。
-- **典型反例形态**：承诺"3 次重试 + 死信"，但重试与去重的先后顺序未定义。
+- **Checkpoints**: failure paths, retry limits and backoff, dead letters, degradation, restart recovery, single points.
+- **Fail criteria**: only says retry, with no limit / no dead letter / no idempotency precondition; no degradation switch; no restart-recovery checklist.
+- **Typical counterexample shape**: promises "3 retries + dead letter", but the ordering between retry and deduplication is undefined.
 
-## D9 容量与性能
+## D9 Capacity and performance
 
-**容量四问（逐条必须给出数字或推导式，缺一即不合格）**
+**The four capacity questions (each must yield a number or a derivation; missing one means fail)**
 
-| # | 必答项 | 合格形态 | 不合格判据 |
+| # | Required answer | Passing shape | Fail criteria |
 |---|---|---|---|
-| 1 | 峰值推导 | `实体数 × 各自频率 + 管理面流量 = 峰值 msg/s`，与声明峰值一致 | 只写"支持 N 台"却无推导；或推导值与声明值不一致（如 500×1Hz + 500×3.33Hz = 2166 vs 声明 1000） |
-| 2 | 内存预算 | `对象数×对象大小 + 在途帧×帧长 + Kafka/缓冲 ≤ 目标内存` | 只有"≤1GB"结论，无逐项分解；队列只限条数不限字节 |
-| 3 | 队列上限与满行为 | 条数上限 + **字节上限** + 满时策略（拒绝/丢最旧/反压）+ 是否按实体隔离 | 无界队列；只限条数；丢帧不区分设备与类别 |
-| 4 | 时延目标与热点 | P99/P999 目标 + 定标依据（压测/估算）+ 热点路径复杂度 | 只给目标不给依据；热点路径全量遍历且无上限校验 |
+| 1 | Peak derivation | `entity count × per-entity frequency + management-plane traffic = peak msg/s`, consistent with the declared peak | Only says "supports N devices" with no derivation; or the derived value disagrees with the declared value (e.g. 500×1Hz + 500×3.33Hz = 2166 vs declared 1000) |
+| 2 | Memory budget | `object count×object size + in-flight frames×frame length + Kafka/buffer ≤ target memory` | Only a "≤1GB" conclusion with no itemized breakdown; queues limit entries only, not bytes |
+| 3 | Queue limits and full behavior | Entry limit + **byte limit** + policy when full (reject/drop-oldest/backpressure) + whether isolated per entity | Unbounded queue; entry-only limit; dropped frames not distinguished by device or category |
+| 4 | Latency targets and hotspots | P99/P999 targets + basis for the figures (load test/estimate) + hotspot path complexity | Targets with no basis; hotspot path does a full traversal with no bound check |
 
-- **检查点**：以上四问；另看扩展路径（何时分片/多实例、触发阈值是否可观测）。
-- **级别**：四问任一缺失或自相矛盾 = P1；导致容量结论整体失效（如分片/线程数按低估峰值定标）= P0。
-- **典型反例形态**：声明 1000 msg/s，但按自己给出的台数与频率算出 2166；队列 16×1024 按条数定标，单帧 1MB 即可吃掉 16GB。
-- **取证**：引用文档中的数字与推导式；不引用即视为缺失。
+- **Checkpoints**: the four questions above; additionally the scaling path (when to shard / go multi-instance, and whether the trigger thresholds are observable).
+- **Level**: any of the four missing or self-contradictory = P1; if it invalidates the capacity conclusion as a whole (e.g. shard/thread counts sized against an underestimated peak) = P0.
+- **Typical counterexample shape**: declares 1000 msg/s, but its own device count and frequency yield 2166; a 16×1024 queue is sized by entries, so a single 1MB frame eats 16GB.
+- **Evidence**: cite the numbers and derivations in the documents; uncited means missing.
 
-## D10 可运维性
+## D10 Operability
 
-- **检查点**：部署拓扑、滚动升级（新旧并存）、配置变更、灰度、回滚、指标、告警。
-- **不合格判据**：升级需停服；配置改动需重启；无关键指标定义。
-- **典型反例形态**：未设计新旧版本并存期间的契约兼容。
+- **Checkpoints**: deployment topology, rolling upgrade (old and new coexisting), config changes, canary, rollback, metrics, alerting.
+- **Fail criteria**: upgrade requires downtime; config changes require restart; no key metrics defined.
+- **Typical counterexample shape**: contract compatibility during old/new coexistence is not designed.
 
-## D11 安全与信任边界
+## D11 Security and trust boundaries
 
-- **检查点**：身份（每条消息 vs 连接态）、鉴权、注入面、密钥、审计、fail-safe。
-- **不合格判据**：身份靠连接态；校验失败"跳过继续"；无审计。
-- **典型反例形态**：只校验连接建立时的身份，之后的每条请求不再验。
+- **Checkpoints**: identity (per message vs connection state), authorization, injection surface, keys, audit, fail-safe.
+- **Fail criteria**: identity relies on connection state; validation failure "skips and continues"; no audit.
+- **Typical counterexample shape**: only the identity at connection establishment is validated; subsequent requests are not verified.
 
-## D12 决策质量
+## D12 Decision quality
 
-- **检查点**：每个关键决策有无备选、有无放弃理由、风险是否被承认。
-- **不合格判据**：只有结论无对比；风险不写；决策与实现冲突。
-- **典型反例形态**：记录了"选用 X"，但没有"为何不用 Y"，出问题无法回溯。
+- **Checkpoints**: does each key decision have alternatives, a reason for rejection, and is the risk acknowledged.
+- **Fail criteria**: conclusion only, no comparison; risks unstated; decisions conflict with implementation.
+- **Typical counterexample shape**: records "chose X" but not "why not Y", so problems cannot be traced back later.
 
-## D13 待定问题收敛度
+## D13 Convergence of open items
 
-- **检查点**：待定项数量、是否有主责、是否阻塞实现、有无截止。
-- **不合格判据**：待定 N 条无主责；阻塞项与非阻塞项混在一起。
-- **典型反例形态**：欠账登记了，但没标哪条阻塞开工，结果实现先行。
+- **Checkpoints**: number of open items, whether each has an owner, whether it blocks implementation, whether there is a deadline.
+- **Fail criteria**: N open items with no owner; blocking and non-blocking items mixed together.
+- **Typical counterexample shape**: debts are registered but nothing marks which one blocks the start, so implementation goes first.
 
-## D14 并发模型与调度设计
+## D14 Concurrency model and scheduling design
 
-**三层逐层声明且自洽**：① I/O 等待策略 ② 线程绑定对象 ③ 跨线程状态共享；定时任务模型；背压层级；扩容方式。
+**Three layers declared one by one and mutually consistent**: ① I/O waiting strategy ② what threads are bound to ③ cross-thread state sharing; timer-task model; backpressure layers; scaling approach.
 
-- **不合格判据**：三层任一未声明；组合自相矛盾；无有界队列；扫描周期 ≥ 业务超时。
-- **典型反例形态**：三套等待/调度机制并存且未声明边界。
+- **Fail criteria**: any of the three layers undeclared; the combination self-contradictory; no bounded queue; scan period ≥ business timeout.
+- **Typical counterexample shape**: three waiting/scheduling mechanisms coexist with no declared boundary.
 
-### D14.1 三层判定法（照此逐层问，不许笼统问"并发模型"）
+### D14.1 Three-layer test (ask layer by layer; do not ask vaguely about "the concurrency model")
 
-并发的三层是**正交**的，必须分开判定：
+The three concurrency layers are **orthogonal** and must be judged separately:
 
-| 层 | 问 | 可选答案 | 不合格信号 |
+| Layer | Question | Possible answers | Fail signal |
 |---|---|---|---|
-| 第 1 层 I/O 等待策略 | 线程等数据时在干什么？ | 阻塞 read / epoll 就绪通知 / IOCP·io_uring 完成通知 | 说不清；或声明 Reactor 但 fd 未设非阻塞 |
-| 第 2 层 线程绑定对象 | 线程绑在什么上？ | 绑连接（TPC）/ 绑任务（池）/ 绑事件循环 / 绑消息队列 | 两种绑定混用无边界；连接数已上千仍用 TPC |
-| 第 3 层 跨线程状态共享 | 状态怎么跨线程？ | 共享内存+锁 / 消息传递 / 不可变快照 | **事故高发区**：这层失守，前两层做什么都救不回来 |
+| Layer 1: I/O waiting strategy | What does the thread do while waiting for data? | Blocking read / epoll readiness notification / IOCP·io_uring completion notification | Cannot say; or claims Reactor but the fd is not set non-blocking |
+| Layer 2: thread binding target | What is the thread bound to? | Bound to connection (TPC) / bound to task (pool) / bound to event loop / bound to message queue | Two bindings mixed with no boundary; still TPC with thousands of connections |
+| Layer 3: cross-thread state sharing | How does state cross threads? | Shared memory + locks / message passing / immutable snapshot | **High-incident zone**: if this layer fails, nothing done in the first two layers can save it |
 
-**关键判据**：性能问题多在第 1、2 层，正确性问题几乎全在第 3 层。只讨论"Reactor 还是 Proactor"等于没审。
+**Key criterion**: performance problems mostly live in layers 1 and 2; correctness problems are almost all in layer 3. Discussing only "Reactor or Proactor" means no review happened.
 
-### D14.2 文档侧信号（可机械扫，见 docstat.mjs）
+### D14.2 Document-side signals (mechanically scannable, see docstat.mjs)
 
-| 信号 | 怎么找 | 指向 | 成立条件 |
+| Signal | How to find | Points to | Condition for holding |
 |---|---|---|---|
-| 并发模型词缺失 | 搜 Reactor / 事件循环 / 线程池 / actor / 每连接一线程 / 单线程 | D14 | 一个都没有 → 未声明（P1）；明确写"单线程，无并发"→ 记 N/A |
-| 模型多套并存 | 搜 主循环 / 回调池 / 线程池 / 独立线程 的分布章节 | D14 | ≥2 种且无边界说明（P1） |
-| 定时扫描散落 | 搜 周期 / 轮询 / 定时 / 每 N 秒 | D14 | ≥3 个模块出现且无统一调度 |
-| 扫描周期 ≥ 超时阈值 | 逐对提取扫描周期与超时值比较 | D14 | 成立 → **P1（超时永远不触发）** |
+| Concurrency-model vocabulary missing | Search Reactor / event loop / thread pool / actor / thread-per-connection / single-threaded | D14 | None present → undeclared (P1); explicitly says "single-threaded, no concurrency" → record N/A |
+| Multiple models coexisting | Search the distribution of main loop / callback pool / thread pool / dedicated thread across sections | D14 | ≥2 kinds with no boundary explanation (P1) |
+| Timer scans scattered | Search period / poll / timer / every N seconds | D14 | Present in ≥3 modules with no unified scheduling |
+| Scan period ≥ timeout threshold | Extract and compare each scan period against the timeout values pairwise | D14 | Holds → **P1 (the timeout can never fire)** |
 
-### D14.3 选型过度（反向检查，同样要报）
+### D14.3 Over-selection (reverse check, also reportable)
 
-先算容量：`消息速率 × 单条处理耗时 = 所需核数占比`。若占比远小于 1 核，复杂线程拓扑属于过度设计（P2）。
-连接数 <1000 不必上 Reactor；瓶颈在算法而不在并发框架时，复杂拓扑是白付的。
+Compute capacity first: `message rate × per-message processing time = fraction of a core needed`. If that fraction is far below 1 core, a complex thread topology is over-engineering (P2).
+Fewer than 1000 connections does not need Reactor; when the bottleneck is the algorithm rather than the concurrency framework, a complex topology is paid for nothing.
 
-### D14.4 三个硬约束（防说教）
+### D14.4 Three hard constraints (anti-preachiness)
 
-1. 只报"信号成立 + 位置明确"，不报"建议采用 XX 模式"。
-2. 必须给代价，并写明"不引入也可接受"的条件。
-3. 对称检查过度设计：一个实现的接口、一个子类的基类 = YAGNI 违规，同样要报（P2）。
+1. Report only "signal holds + location is explicit"; do not report "suggest adopting pattern XX".
+2. Must give the cost, and state the condition under which "not introducing it is also acceptable".
+3. Symmetrically check over-engineering: an interface with one implementation, a base class with one subclass = YAGNI violation, also reportable (P2).
 
-### D14.5 并发不变量库（CONC-1~7）
+### D14.5 Concurrency invariant library (CONC-1~7)
 
-| 编号 | 不变量 | 违反症状 |
+| ID | Invariant | Violation symptom |
 |---|---|---|
-| CONC-1 | 单写者：任何可变状态只由固定一个线程写 | 偶发错乱、压测不复现 |
-| CONC-2 | 按 key 分片：同 key 操作落同一 owner | 顺序错乱 |
-| CONC-3 | 队列有界且满行为显式 | 内存雪崩 |
-| CONC-4 | 锁内不做 I/O、不调外部回调、不分配、不取第二把锁 | 锁持有不可控 |
-| CONC-5 | 多锁全局固定序号、单向获取 | 死锁 |
-| CONC-6 | 读多写少用不可变快照（COW + 原子替换） | 写者阻塞全体读者 |
-| CONC-7 | 并发可观测：线程名、队列深度、锁等待、事件循环延迟 | 无法区分业务重与锁争抢 |
+| CONC-1 | Single writer: any mutable state is written by exactly one fixed thread | Sporadic corruption that never reproduces under load |
+| CONC-2 | Shard by key: operations on the same key land on the same owner | Out-of-order processing |
+| CONC-3 | Queues are bounded and full behavior is explicit | Memory avalanche |
+| CONC-4 | No I/O, no external callbacks, no allocation, and no second lock inside a lock | Unbounded lock hold time |
+| CONC-5 | Multiple locks have a globally fixed order and are acquired in one direction | Deadlock |
+| CONC-6 | Read-mostly data uses immutable snapshots (COW + atomic swap) | A writer blocks all readers |
+| CONC-7 | Concurrency observability: thread names, queue depth, lock waits, event-loop latency | Cannot tell business load from lock contention |
 
-**D14 判定要求**：文档必须明确承诺适用哪些条；不适用的要写明理由（如"单线程服务，CONC-2 不适用"）。蓝队辩护只能引这张表，不能引"设计如此"。
+**D14 judgement requirement**: the documents must explicitly commit to which invariants apply; inapplicable ones must state a reason (e.g. "single-threaded service, CONC-2 does not apply"). The blue team may defend only by citing this table, never by "that is how the design is".
 
-## D15 抽象一致性
+## D15 Abstraction consistency
 
-**同一概念是否单一表达；跨模块重复逻辑是否下沉；术语是否统一；扩展点是否预留；是否有单实现接口/单子类基类。**
+**Is the same concept expressed once; is duplicated cross-module logic pushed down; are terms unified; are extension points reserved; are there single-implementation interfaces / single-subclass base classes.**
 
-- **不合格判据**：同概念 2+ 表达且需转换；新增一类要改 3+ 处；术语表缺失。
-- **典型反例形态**：同一概念有两套类型定义，中间还要写转换代码。
+- **Fail criteria**: the same concept has 2+ expressions requiring conversion; adding a new kind requires changes in 3+ places; no glossary.
+- **Typical counterexample shape**: one concept has two type definitions with conversion code in between.
 
-### D15.1 文档侧信号
+### D15.1 Document-side signals
 
-| 信号 | 怎么找 | 成立条件 |
+| Signal | How to find | Condition for holding |
 |---|---|---|
-| 同概念多类型 | 搜命名族（XxxState/Xxx2D/XxxPose、单复数对） | ≥2 套且需转换代码（P1/P2） |
-| 扩展点未描述 | 新增一类实体/接口/数据格式的流程是否写"要改哪几处" | 未写，或写了 ≥3 处 → P2 |
-| 单实现接口 | 出现接口/抽象基类但只描述一个实现 | 无预留理由 → 过度设计 P2 |
-| 术语表缺失 | 全文无术语章节 | P3 |
+| Same concept, multiple types | Search naming families (XxxState/Xxx2D/XxxPose, singular/plural pairs) | ≥2 sets and conversion code required (P1/P2) |
+| Extension point undescribed | Does the flow for adding a new entity/interface/data format say "which places must change" | Not written, or ≥3 places listed → P2 |
+| Single-implementation interface | An interface/abstract base class appears but only one implementation is described | No reason reserved → over-engineering P2 |
+| Glossary missing | No terminology section anywhere | P3 |
 
-## D12/D14/D15 级别上限（防噪声核心）
+## Level caps for D12/D14/D15 (the anti-noise core)
 
-| 发现 | 上限 | 理由 |
+| Finding | Cap | Reason |
 |---|---|---|
-| 缺设计模式（策略/工厂/观察者…） | **P2** | 品味与成本权衡，不阻断 |
-| 缺统一抽象，且已在多处复制同一缺陷 | P1 | 一处修多处漏 = 真实风险 |
-| 缺统一抽象，未造成重复缺陷 | P2 | 维护成本，非功能错误 |
-| 过度设计 | P2 | YAGNI |
-| 并发模型不一致 / 阻塞 reactor | **P1**（会死锁/饿死可 P0） | 直接影响稳定性 |
-| 扫描周期 ≥ 业务超时 | **P1** | 功能性错误：超时永不触发 |
-| 决策只写结论不写放弃理由 | **P2** | 无法被后人 review |
+| Missing design pattern (strategy/factory/observer…) | **P2** | Taste and cost trade-off; not blocking |
+| Missing unified abstraction, and the same defect is already duplicated in several places | P1 | Fixing one place leaves the others = real risk |
+| Missing unified abstraction, without duplicated defects | P2 | Maintenance cost, not a functional error |
+| Over-engineering | P2 | YAGNI |
+| Inconsistent concurrency model / blocked reactor | **P1** (P0 if it can deadlock/starve) | Direct impact on stability |
+| Scan period ≥ business timeout | **P1** | Functional error: the timeout never fires |
+| Decision records only the conclusion, not the reason for rejection | **P2** | Cannot be reviewed by later readers |

@@ -1,35 +1,35 @@
-# 红队任务书（攻击方）
+# Red team brief (attacker)
 
-## 角色
+## Role
 
-证明这份代码是错的。你是对手，不是合作者。
+Prove this code is wrong. You are the opponent, not a collaborator.
 
-## KPI（双指标，缺一即失败）
+## KPI (dual metric; missing either one is failure)
 
-1. **高风险面必须逐项有结论**：S2 状态面、S3 执行面（并发/资源/错误）、S5 安全面——每面都要给出"检查了哪些点、为何无可成立指控"。
-2. 成立的指控数只作辅助。只报低风险区的小问题、高风险面交白卷 = 失败。写"整体良好" = 失败。
+1. **Every high-risk surface must have a per-item conclusion**: S2 state surface, S3 execution surface (concurrency/resources/errors), S5 security surface — each must state "which points were checked and why no accusation holds".
+2. The number of upheld accusations is auxiliary only. Reporting only small issues in low-risk areas and submitting blank on high-risk surfaces = failure. Writing "overall fine" = failure.
 
-## 只允许读
+## Read only
 
 ```
-{{DIFF_RANGE}}        # 变更文件与上下文
+{{DIFF_RANGE}}        # changed files and context
 <skill-root>/lenses/  <skill-root>/drift.md
-{{AMMUNITION}}        # 弹药库（见下）
+{{AMMUNITION}}        # ammunition (see below)
 ```
 
-**禁止**读审核目录下任何产物（尤其 `07-defense.json`、`08-verdict.json`）。
+**Forbidden**: reading any artifact in the review directory (especially `07-defense.json`, `08-verdict.json`).
 
-## 弹药库
+## Ammunition
 
-| 弹药 | 用法 |
+| Ammunition | Usage |
 |---|---|
-| 20 镜头触发条件 | 逐镜头套；先信号后深读 |
-| 信任边界表 | 每个不可信入口 × 九类攻击 |
-| 恶意输入构造 | 超长、负数、深嵌套、`..`、类型混淆、重复 ID |
-| 并发交错序列 | 给出两个线程的具体交错步骤，导出错误状态 |
-| 负向约束检查 | task.md「实现的约束」+ 不变量库（CONC-1..7） |
+| 20 lens triggers | Apply lens by lens; signal first, then deep read |
+| Trust boundary table | Every untrusted entry × nine attack classes |
+| Malicious input construction | Overlong, negative numbers, deep nesting, `..`, type confusion, duplicate IDs |
+| Concurrency interleaving sequences | Give the concrete interleaving steps of two threads and derive the wrong state |
+| Negative constraint check | task.md "constraints on the implementation" + invariant library (CONC-1..7) |
 
-## 输出 schema
+## Output schema
 
 ```json
 {
@@ -39,20 +39,20 @@
     "source_batches": ["b05", "b09"],
     "dimension_or_lens": "2",
     "location": "src/runtime/state.cpp:88",
-    "mechanism": "两个线程直写同一 map，无锁且无 owner 线程",
-    "consequence": "压测下偶发丢更新，重启后状态回退",
+    "mechanism": "Two threads write the same map directly, no lock and no owner thread",
+    "consequence": "Occasional lost updates under load; state regresses after restart",
     "severity_suggest": "P1",
     "confidence": "medium"
   }],
-  "coverage_note": "S2/S3/S5 三面逐项结论：…；镜头 19 仅报信号命中处，模式类封顶 P2"
+  "coverage_note": "Per-item conclusions for the three surfaces S2/S3/S5: …; lens 19 reports only where a signal hit, pattern-only classes capped at P2"
 }
 ```
 
-## 举证要求
+## Evidence requirements
 
-位置 + 机制（触发条件/攻击路径/交错序列）+ 后果，三者缺一即无效。
-"这里可能有并发问题"这类无位置判断一律驳回。
+Location + mechanism (trigger condition / attack path / interleaving sequence) + consequence: missing any one of the three makes it invalid.
+Location-free judgements such as "there may be a concurrency problem here" are rejected outright.
 
-## 分批
+## Batching
 
-候选超过 15 条时按组分批（每批独立实例）。
+When candidates exceed 15, batch them by group (each batch a separate instance).

@@ -1,22 +1,22 @@
-# 工艺合规检查表（design 专属）
+# Craft compliance checklist (design-specific)
 
-评审 archify 产物不仅要看内容对不对，还要看**产物本身合不合工艺**。
+Reviewing archify artifacts means checking not only whether the content is right, but also whether **the artifacts themselves follow the craft rules**.
 
-| # | 检查项 | 判据 | 级别 |
+| # | Check item | Criterion | Level |
 |---|---|---|---|
-| 1 | 文档编号连续性 | 03+ 模块文档编号无跳号、无重号（删除须有说明） | P2 |
-| 2 | 契约清单表编号连续性 | 各清单表"编号"列无跳号（删除须有说明） | P3 |
-| 3 | 固定章节完整 | 模块 8 章、架构 15 章、契约 10 章、数据 8 章齐全；缺章须写"不适用 + 理由" | P2 |
-| 4 | 表格列完整 | 字段表含可见性/约束列；函数表含签名/调用方/入参/返回值/异常 | P2 |
-| 5 | 图表齐备 | 每个端到端流程配一张时序图；`json/svg/html` 三件套一致 | P3 |
-| 6 | state 与变更清单一致 | `state.yaml.change_list.path` 指向的文件存在且是最后一次变更 | P2 |
-| 7 | reopen 异常 | 同一文档 reopen ≥3 次 → 列为高风险，逐节细查 | 风险权重（非独立级别） |
-| 8 | 残留检查 | 已删概念是否仍被其他文档引用（00 删除的字段 03 仍在用） | **P1** |
+| 1 | Document numbering continuity | 03+ module document numbers have no gaps and no duplicates (deletions must be explained) | P2 |
+| 2 | Contract list-table numbering continuity | The "number" column of each list table has no gaps (deletions must be explained) | P3 |
+| 3 | Fixed sections complete | Module 8 / architecture 15 / contract 10 / data 8 sections all present; a missing section must say "N/A + reason" | P2 |
+| 4 | Table columns complete | Field tables include visibility/constraint columns; function tables include signature/callers/parameters/return value/exceptions | P2 |
+| 5 | Diagrams complete | Every end-to-end flow has a sequence diagram; the `json/svg/html` trio is consistent | P3 |
+| 6 | state consistent with change list | The file pointed to by `state.yaml.change_list.path` exists and is the latest change | P2 |
+| 7 | Abnormal reopen | The same document reopened ≥3 times → list as high risk and examine section by section | Risk weight (not a standalone level) |
+| 8 | Residue check | Concepts already deleted are still referenced by other documents (a field removed from 00 is still used in 03) | **P1** |
 
-**判断保留**：工艺问题大多是 P2/P3，不能压倒内容缺陷。但第 8 项"残留"常常是 P1——它意味着**设计内部已经不自洽**，实现必然踩坑。
+**Judgement reserved**: craft problems are mostly P2/P3 and must not outweigh content defects. But item 8 "residue" is often P1 — it means **the design is already internally inconsistent**, and the implementation will inevitably stumble.
 
-## 执行方式
+## How to execute
 
-1. `node scripts/docstat.mjs <projectRoot>` 取基线表、章节缺失、编号跳号、reopen 分布。
-2. 人工核对第 2、4、5、8 项（脚本不覆盖）。
-3. 第 8 项建议做法：从 change-list 的「文件修改台账」里找出标记为"删除/改名"的符号，全仓 grep 反向引用。
+1. `node scripts/docstat.mjs <projectRoot>` to get the baseline table, missing sections, numbering gaps, and reopen distribution.
+2. Manually check items 2, 4, 5, 8 (the script does not cover them).
+3. Suggested approach for item 8: take the symbols marked as "deleted/renamed" from the change-list's "文件修改台账", then grep the whole repo for reverse references.

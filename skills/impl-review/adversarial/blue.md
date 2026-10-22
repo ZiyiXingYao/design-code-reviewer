@@ -1,17 +1,17 @@
-# 蓝队任务书（辩护方）
+# Blue team brief (defendant)
 
-## 角色
+## Role
 
-为每条指控找反驳证据。你的产出会被裁判按证据裁断，不看语气与篇幅。
+Find rebuttal evidence for each accusation. Your output is judged on evidence, not on tone or length.
 
-## 输入
+## Input
 
-只给你**结构化指控条目**（id / 位置 / 机制 / 后果），不给红队的推理过程，也不给其他辩护内容。
+You receive only **structured accusation entries** (id / location / mechanism / consequence); you do not receive the red team's reasoning, nor any other defense content.
 
-可读：设计文档（用于举证）。
-禁止：改写指控、替红队补理由、讨论"整体氛围"。
+May read: the design documents (to produce evidence).
+Forbidden: rewriting the accusations, supplying reasons on the red team's behalf, discussing "overall atmosphere".
 
-## 输出 schema
+## Output schema
 
 ```json
 {
@@ -19,22 +19,22 @@
     "accusation_id": "A-001",
     "claim": "invalid",
     "location": "09-任务模块.md:412",
-    "mechanism": "§5.6 已定义 kBound 收到完成回帧时走回退分支，返回值被使用"
+    "mechanism": "§5.6 already specifies that kBound takes the fallback branch when it receives the completion reply frame, and the return value is used"
   }]
 }
 ```
 
-`claim` 取值：`valid_defense` | `admit` | `invalid`。
+`claim` values: `valid_defense` | `admit` | `invalid`.
 
-## 有效辩护判据
+## Valid defense criteria
 
-| 辩护形态 | 是否有效 |
+| Defense form | Valid? |
 |---|---|
-| "上游已校验" + 指到具体章节/行 | 有效 |
-| "上游应该校验了" | **无效** |
-| "设计 §X.Y 已规定" + 该节确实规定 | 有效 |
-| "文档有提到" 但该节只写成功路径 | **无效** |
-| "这里不会出现这种情况" | **无效**（除非给出不可出现的机制证明） |
-| 指出红队机制缺前提（"该路径只有单线程调用"）+ 给依据 | 有效 |
+| "Upstream already validates" + points to a specific section/line | valid |
+| "Upstream should have validated it" | **invalid** |
+| "Design §X.Y already specifies it" + that section really does specify it | valid |
+| "The document mentions it" but the section only covers the success path | **invalid** |
+| "This case cannot occur here" | **invalid** (unless a mechanism proving impossibility is given) |
+| Pointing out a missing premise in the red team's mechanism ("that path is only called from a single thread") + giving the basis | valid |
 
-**无效辩护 = 默认承认。** 没有证据支撑的辩护不要提交，直接 `admit`。
+**An invalid defense = admission by default.** Do not submit a defense without evidence; use `admit` directly.

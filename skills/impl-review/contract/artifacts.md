@@ -1,85 +1,85 @@
-# archify 产物契约（impl 视角）
+# archify Artifacts Contract (impl perspective)
 
-实现评审的对象是**代码**，设计只是基准。产物缺失**不阻断评审**，只降低基准等级。
+The subject of implementation review is **code**; the design is only the baseline. Missing artifacts **do not block the review**; they only lower the baseline level.
 
-## 1 产物清单与用途
+## 1 Artifact List and Purpose
 
-| 产物 | 必需 | 用途 | 缺失后果 |
+| Artifact | Required | Purpose | Consequence if missing |
 |---|---|---|---|
-| `specs/design/00-接口契约.md` | 否 | 断言源（实体/字段/键/主题/接口） | 跳过契约断言；基准降 L0 |
-| `specs/design/01-架构设计.md` | 否 | 模块划分、接口矩阵、文件树 | 跳过结构对照 |
-| `specs/design/02-实体与数据设计.md` | 否 | 状态机、数据模型 | 跳过状态机对照 |
-| `specs/design/03+NN-*.md` | 否 | 类清单、类详细设计 | 跳过类层对照 |
-| `specs/design/task.md` | 否 | 需求/约束/验收三类对照 | 跳过承诺核验；镜头 0 无法执行 |
-| `specs/design/diagrams/` | 否 | 调用顺序 | 该节跳过并注明 |
-| `.brainstorming-archify/state.yaml` | 否 | 基准等级判定 | 保守判 L0 |
-| `specs/audit/*-design/` | **不读** | 设计评审结果不参与实现评审 | 不降级；基准只取设计文档与 archify state |
+| `specs/design/00-接口契约.md` | No | assertion source (entities/fields/keys/topics/interfaces) | skip contract assertions; baseline drops to L0 |
+| `specs/design/01-架构设计.md` | No | module split, interface matrix, file tree | skip structure cross-check |
+| `specs/design/02-实体与数据设计.md` | No | state machine, data model | skip state machine cross-check |
+| `specs/design/03+NN-*.md` | No | class list, detailed class design | skip class-level cross-check |
+| `specs/design/task.md` | No | requirement/constraint/acceptance cross-checks | skip commitment verification; lens 0 cannot run |
+| `specs/design/diagrams/` | No | call sequence | skip that section and note it |
+| `.brainstorming-archify/state.yaml` | No | baseline level decision | conservatively judge L0 |
+| `specs/audit/*-design/` | **Do not read** | design review results play no part in implementation review | no downgrade; baseline comes only from design docs and archify state |
 
-## 2 基准等级 L0 / L1 / L2
+## 2 Baseline Levels L0 / L1 / L2
 
-| 等级 | 判定 | 报告标注 |
+| Level | Decision | Report label |
 |---|---|---|
-| L2 | 设计齐全 + `state=closed` | `基准: L2（设计已冻结）` |
-| L1 | 设计齐全但未冻结（state≠closed） | `基准: L1（设计未冻结）` |
-| L0 | 无设计 / `draft`·`explore` / 仅部分文档 / 只改代码 | `基准: L0（未做设计对照）` |
+| L2 | Design complete + `state=closed` | `基准: L2（设计已冻结）` |
+| L1 | Design complete but not frozen (state≠closed) | `基准: L1（设计未冻结）` |
+| L0 | No design / `draft`·`explore` / only partial docs / code-only changes | `基准: L0（未做设计对照）` |
 
-规则：
+Rules:
 
-1. L0 是完整评审：19 个镜头全跑（镜头 0 除外并标注）。
-2. **L0 不许冒充 L1/L2**；报告标题下一行显著标注，SUMMARY 结论首句带等级。
-3. 用户传 `--require-design` 时，产物不全即拒绝运行（输出 `preflight-failed.md`）。
+1. L0 is a full review: all 19 lenses run (lens 0 excepted and marked).
+2. **L0 must not masquerade as L1/L2**; mark it prominently on the line below the report title, and put the level in the first sentence of the SUMMARY conclusion.
+3. When the user passes `--require-design`, refuse to run if artifacts are incomplete (output `preflight-failed.md`).
 
-## 3 state.yaml 与状态门禁
+## 3 state.yaml and State Gating
 
-schema 与 design 侧一致（`schema_version/state/files/reopens/change_list/task_md`）。
+The schema is identical to the design side (`schema_version/state/files/reopens/change_list/task_md`).
 
-| state | impl 处置 |
+| state | impl handling |
 |---|---|
-| `closed` | 可 L1/L2 |
-| `confirm` | 可对照，标「基准未冻结」 |
-| `draft` / `explore` | **降到 L0**，标「设计未冻结，未做对照」 |
+| `closed` | L1/L2 allowed |
+| `confirm` | may be cross-checked, mark "baseline not frozen" |
+| `draft` / `explore` | **downgrade to L0**, mark "design not frozen, no cross-check performed" |
 
-理由：拿一份还在变的基准判"实现不符"会产生大量伪缺陷。
+Rationale: judging "implementation does not match" against a baseline that is still moving produces a large number of false defects.
 
-## 4 task.md 四段式
+## 4 The Four Sections of task.md
 
-每个任务由四段组成，分别对应四组断言：
+Each task consists of four sections, corresponding to four groups of assertions:
 
-| 段落 | 断言性质 | 验证方式 | 不过的级别 |
+| Section | Assertion nature | Verification method | Level if failed |
 |---|---|---|---|
-| `[实现的功能]` | 正向：代码应有对应改动 | 定位文件与方法是否存在 | P1 |
-| `[任务实现的要求]` | 正向：对齐指定章节 | 逐条比对设计章节约束 | P1 |
-| `[实现的约束]` | **负向：不该出现的不能出现** | `git diff` 查被禁改动、`grep` 查被禁依赖 | **P0** |
-| `[验收标准]` | 正向：描述的测试应存在 | 在 `test/` 找用例并核对断言 | **P0（假勾选）** |
+| `[实现的功能]` | positive: the code should have the corresponding change | locate whether the file and method exist | P1 |
+| `[任务实现的要求]` | positive: align with the specified sections | compare against the design section constraints item by item | P1 |
+| `[实现的约束]` | **negative: what must not appear must not appear** | `git diff` for forbidden changes, `grep` for forbidden dependencies | **P0** |
+| `[验收标准]` | positive: the described tests should exist | find the cases in `test/` and check the assertions | **P0 (false checkmark)** |
 
-**假勾选识别**：`[x]` + 验收标准里的测试在 `test/` 找不到 → P0。
-这是全流程最危险的一类，因为它让所有人以为已完成。
+**Detecting false checkmarks**: `[x]` + a test named in the acceptance criteria that cannot be found in `test/` → P0.
+This is the most dangerous class in the whole pipeline, because it makes everyone believe the work is done.
 
-## 5 结构特征校验
+## 5 Structural Feature Validation
 
-| 特征 | 校验方式 | 不匹配时 |
+| Feature | Validation method | If mismatched |
 |---|---|---|
-| 文件编号体系 | 00/01/02 固定，模块 03+ 连续 | 告警 + 要求人工确认，停止断言抽取 |
-| 契约章节 | 00 的 10 节是否齐 | 告警 |
-| 模块章节 | 模块 8 节是否齐 | 告警 |
-| state schema | 四个必需字段 | 缺 → 保守 L0 |
+| File numbering system | 00/01/02 fixed, modules 03+ consecutive | warn + require human confirmation, stop assertion extraction |
+| Contract sections | are all 10 sections of 00 present | warn |
+| Module sections | are all 8 module sections present | warn |
+| state schema | the four required fields | missing → conservatively L0 |
 
-## 6 设计基准来源（不依赖任何评审结果）
+## 6 Design Baseline Sources (independent of any review result)
 
-实现评审只读两类输入：
+Implementation review reads only two kinds of input:
 
-| 输入 | 用途 |
+| Input | Purpose |
 |---|---|
-| `specs/design/*.md` + `diagrams/` | 断言、结构/行为/需求/约束/验收对照 |
-| `.brainstorming-archify/state.yaml` | 基准等级（是否冻结） |
+| `specs/design/*.md` + `diagrams/` | assertions; structure/behavior/requirement/constraint/acceptance cross-checks |
+| `.brainstorming-archify/state.yaml` | baseline level (whether frozen) |
 
-规则：
+Rules:
 
-| 情况 | 处置 |
+| Case | Handling |
 |---|---|
-| `full` | 对照全部设计文档 |
-| `delta` | 只对照 `design-scope.json` 命中的文档与章节；未命中部分记「设计缺口」提示 |
-| 设计评审报告（`specs/audit/*-design/`） | **不读、不继承**：它的结论、欠账、C-n 都不构成实现评审的基准 |
-| 设计缺失/非 closed | 按 L0 / L1 处理 |
+| `full` | cross-check all design docs |
+| `delta` | cross-check only the docs and sections matched by `design-scope.json`; anything unmatched is recorded as a "design gap" note |
+| Design review report (`specs/audit/*-design/`) | **do not read, do not inherit**: its conclusions, debts and C-n items do not constitute a baseline for implementation review |
+| Design missing / not closed | handle as L0 / L1 |
 
-设计文档不可能面面俱到：代码里有、文档没写的实现属于**设计缺口**，只记提示，不算实现缺陷。
+Design docs cannot cover everything: an implementation that exists in code but is not written in the docs is a **design gap**, recorded as a note only, not counted as an implementation defect.

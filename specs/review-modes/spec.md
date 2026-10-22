@@ -2,89 +2,89 @@
 
 ## Purpose
 
-定义 design-review 与 impl-review 的两种评审模式（全量 / 增量），以及两者之间的独立性边界。
+Defines the two review modes (full / delta) of design-review and impl-review, and the independence boundary between them.
 
 ## Requirements
 
-### Requirement: 模式必须在开跑前声明
+### Requirement: The mode must be declared before the run starts
 
-系统 SHALL 在 `init` 时把 `mode` 写入 `state.yaml` 与 `plan.json`；design 默认 `full`，impl 默认 `delta`。`delta` 必须同时提供 `from` 与 `to`。
+The system SHALL write `mode` into `state.yaml` and `plan.json` at `init`; design defaults to `full` and impl to `delta`. `delta` must supply both `from` and `to`.
 
-#### Scenario: 增量缺区间
+#### Scenario: delta without a range
 
-- **WHEN** `init --mode delta` 未给 `--from`
-- **THEN** 命令拒绝执行，不创建工作目录
+- **WHEN** `init --mode delta` is run without `--from`
+- **THEN** the command refuses to run and no working directory is created
 
-#### Scenario: 报告声明
+#### Scenario: declaration in the report
 
-- **WHEN** 报告缺少「评审模式：全量 / 增量 `from..to`」
-- **THEN** gate G21 拒绝
+- **WHEN** the report lacks the "评审模式：全量 / 增量 `from..to`" declaration
+- **THEN** gate G21 rejects
 
-#### Scenario: 状态与计划不一致
+#### Scenario: state and plan disagree
 
-- **WHEN** `state.mode`/`state.range` 与 `plan.json` 不一致
-- **THEN** gate G22 拒绝
+- **WHEN** `state.mode`/`state.range` disagree with `plan.json`
+- **THEN** gate G22 rejects
 
-### Requirement: 设计全量评审只读当前文档
+### Requirement: Full design review reads only the current documents
 
-系统 SHALL 在全量模式下评审 `specs/design/` 当前工作区的全部内容，**不读取 git 提交历史**，报告不得以 commit 作为基线。
+The system SHALL review all current content of `specs/design/` in the working tree in full mode, **never read git commit history**, and the report must not use a commit as its baseline.
 
-#### Scenario: 全量范围
+#### Scenario: full scope
 
 - **WHEN** `mode=full`
-- **THEN** 评审范围 = `specs/design/*.md` + `diagrams/`；报告写「评审模式：全量（工作区当前版本）」
-- **AND** 15 维度 / 17 场景 / 20 漏项 全跑（覆盖下限不变）
+- **THEN** scope = `specs/design/*.md` + `diagrams/`; the report states "评审模式：全量（工作区当前版本）"
+- **AND** all 15 dimensions / 17 scenarios / 20 completeness items run (the coverage floor is unchanged)
 
-### Requirement: 设计增量评审锁定版本区间
+### Requirement: Delta design review pins a version range
 
-系统 SHALL 在增量模式下以 `git diff from..to -- specs/design` 为唯一范围，审改动章节及其直接引用/被引用章节。
+The system SHALL use `git diff from..to -- specs/design` as the only scope in delta mode, reviewing the changed sections plus the sections that directly reference them or are referenced by them.
 
-#### Scenario: 生成范围
+#### Scenario: scope generation
 
-- **WHEN** 执行 `scope.mjs <root> --from A --to B --out <reviewDir>`
-- **THEN** 产出 `scope.json`：变更文件、每处改动所属章节、引用这些文件/章节的其它文档章节
-- **AND** 区间内无设计变更时以 3 退出
+- **WHEN** `scope.mjs <root> --from A --to B --out <reviewDir>` runs
+- **THEN** it produces `scope.json`: changed files, the section each change belongs to, and sections of other documents that reference these files/sections
+- **AND** it exits with 3 when the range contains no design changes
 
-#### Scenario: 覆盖下限
+#### Scenario: coverage floor
 
 - **WHEN** `mode=delta`
-- **THEN** `plan.expected` 必须声明受影响的 dimension/scenario/completeness（均 ≥1）且 `plan.scope_file` 存在
-- **AND** 报告必须列出 `scope.json` 的全部变更文件，并写「未覆盖声明」（gate G23）
+- **THEN** `plan.expected` must declare the affected dimension/scenario/completeness counts (all ≥1) and `plan.scope_file` must exist
+- **AND** the report must list every changed file in `scope.json` and include the "未覆盖声明" (uncovered declaration) section (gate G23)
 
-### Requirement: 实现评审不依赖设计评审结果
+### Requirement: Implementation review does not depend on design review results
 
-系统 SHALL 只以 `specs/design/` 与 archify `state.yaml` 判定基准，**不读取** `specs/audit/*-design/` 的报告、欠账或约束。
+The system SHALL determine the baseline only from `specs/design/` and the archify `state.yaml`, and **never read** reports, outstanding debts or constraints under `specs/audit/*-design/`.
 
-#### Scenario: 基准等级
+#### Scenario: baseline level
 
-- **WHEN** 设计齐全且 `state=closed`
+- **WHEN** the design is complete and `state=closed`
 - **THEN** L2
-- **WHEN** 设计齐全但未冻结
+- **WHEN** the design is complete but not frozen
 - **THEN** L1
-- **WHEN** 无设计或产物不全
+- **WHEN** there is no design or the artifacts are incomplete
 - **THEN** L0
 
-#### Scenario: 不继承评审结论
+#### Scenario: review conclusions are not inherited
 
-- **WHEN** 存在任何历史设计评审报告（含旧交接块）
-- **THEN** 不影响 `preflight.json` 的等级，也不进入 `claims.json` 的断言集
+- **WHEN** any historical design review report exists (including old handoff blocks)
+- **THEN** it does not affect the level in `preflight.json` and does not enter the assertion set of `claims.json`
 
-### Requirement: 实现评审双模式
+### Requirement: Implementation review has two modes
 
-系统 SHALL 支持 `full`（整仓代码 vs 全部设计文档）与 `delta`（`from..to` 代码变更 vs 命中的设计章节）。
+The system SHALL support `full` (whole-repo code vs all design documents) and `delta` (`from..to` code changes vs the matched design sections).
 
-#### Scenario: 增量映射
+#### Scenario: delta mapping
 
-- **WHEN** 执行 `related-design.mjs <root> --from A --to B --out <reviewDir>`
-- **THEN** 产出 `design-scope.json`：命中的设计文档与章节、未被任何设计文档覆盖的代码文件
-- **AND** gate G23 要求报告涉及每份命中的设计文档，并在存在未覆盖代码时登记「设计缺口」
+- **WHEN** `related-design.mjs <root> --from A --to B --out <reviewDir>` runs
+- **THEN** it produces `design-scope.json`: the matched design documents and sections, plus the code files not covered by any design document
+- **AND** gate G23 requires the report to cover every matched design document and to register a "设计缺口" (design gap) whenever uncovered code exists
 
-### Requirement: 设计缺口不构成缺陷
+### Requirement: A design gap is not a defect
 
-系统 SHALL 把「代码有、设计文档无」的实现记为设计缺口提示，不计入 P0–P2、不进入对抗、不进入 `task.md`；只有「文档有、代码无」（DR-1）才是缺陷。
+The system SHALL record a "code exists, design document does not" implementation as a design-gap advisory, excluded from P0–P2, from the adversarial pass, and from `task.md`; only "document exists, code does not" (DR-1) is a defect.
 
-#### Scenario: 未覆盖代码
+#### Scenario: uncovered code
 
-- **WHEN** 代码变更的文件/符号未在任何设计文档出现
-- **THEN** 报告 §5 双向缺口登记「设计缺口（提示）」
-- **AND** 不生成修复任务，不影响评审结论级别
+- **WHEN** a changed file/symbol appears in no design document
+- **THEN** report §5 bidirectional gaps registers "设计缺口（提示）" (design gap — advisory)
+- **AND** no fix task is generated and the review conclusion level is unaffected

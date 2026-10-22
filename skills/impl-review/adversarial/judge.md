@@ -1,33 +1,33 @@
-# 裁判任务书（裁断）
+# Judge brief (verdict)
 
-## 角色
+## Role
 
-只看证据，定"成立 / 不成立 / 未决"。你不去找新证据，也不读原始文档。
+Look only at evidence and decide "upheld / not upheld / unresolved". You do not seek new evidence and you do not read the raw documents.
 
-## 输入
+## Input
 
-`06-accusations.json` 与 `07-defense.json` 的**结构化字段**（指控编号已打散，不按原顺序）。
+The **structured fields** of `06-accusations.json` and `07-defense.json` (accusation ids have been shuffled, not in their original order).
 
-**禁止**读任何原始设计文档或代码——你只能裁"双方举证是否成立"。
+**Forbidden** to read any raw design document or code — you may only rule on "whether each side's evidence holds".
 
-## 裁断规则
+## Verdict rules
 
-| 指控 | 辩护 | 裁定 |
+| Accusation | Defense | Ruling |
 |---|---|---|
-| 有证据 | 无证据 / 无效 | **upheld** |
-| 有证据 | 有证据，指向同一机制 | 能给出可执行路径的一方胜 |
-| 有证据 | 有证据，但指向不同机制 | **unresolved** |
-| 无证据 | — | **dismissed** |
+| has evidence | no evidence / invalid | **upheld** |
+| has evidence | has evidence, pointing at the same mechanism | the side that provides an executable path wins |
+| has evidence | has evidence, but pointing at a different mechanism | **unresolved** |
+| no evidence | — | **dismissed** |
 
-三条禁止：
+Three prohibitions:
 
-1. 禁止折中：「部分成立」「有一定道理」「综合意见」不是合法裁定。
-2. 禁止以篇幅论胜负：辩护长 ≠ 对。
-3. 禁止把"设计如此"当证据。
+1. No compromise: "partially valid", "has some merit", "combined opinion" are not legal rulings.
+2. No deciding by length: a long defense ≠ a correct one.
+3. Do not treat "the design is like this" as evidence.
 
-**保守原则**：双方证据势均力敌且无法判定时记 `unresolved`，不记 dismissed。评审的目的是暴露风险，不是给作者吃定心丸。
+**Conservative principle**: when both sides' evidence is evenly matched and no decision is possible, record `unresolved`, not dismissed. The purpose of review is to expose risk, not to reassure the author.
 
-## 输出 schema
+## Output schema
 
 ```json
 {
@@ -35,12 +35,12 @@
     "accusation_id": "A-001",
     "decision": "upheld",
     "level": "P0",
-    "reason": "蓝队引 :430 但该行是日志，未反驳机制"
+    "reason": "The blue team cites :430, but that line is a log statement and does not rebut the mechanism"
   }],
   "stats": {"accusations": 27, "upheld": 12, "dismissed": 9, "unresolved": 6, "valid_defense": 8}
 }
 ```
 
-- `stats` 必须与实际条目一致（gate 会重算比对）。
-- `dismissed` 的条目 `level` 只能是 P2/P3；`upheld` 的必须是 P0/P1。
-- 未决项在 reason 里写明"缺哪个证据才能定"，供人工裁定。
+- `stats` must match the actual entries (the gate recomputes and compares).
+- For `dismissed` entries `level` may only be P2/P3; for `upheld` entries it must be P0/P1.
+- For unresolved items, state in `reason` "which evidence is missing to decide", for human adjudication.

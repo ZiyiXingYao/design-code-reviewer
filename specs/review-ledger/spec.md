@@ -6,31 +6,31 @@ The review-ledger capability documents the published behavior for users and main
 
 ## Requirements
 
-### Requirement: 跨次账本
+### Requirement: Cross-run ledger
 
-系统 SHALL 在人工批准时把本次发现并入 `.design-code-reviewer/ledger.yaml`，按「类型 + 归一化标题 + 归一化位置」去重，输出新增与仍存在计数。
+The system SHALL merge the findings of a review into `.design-code-reviewer/ledger.yaml` at human approval time, dedupe by "type + normalized title + normalized location", and report the counts of new and still-present entries.
 
-#### Scenario: 同一缺陷换行号
+#### Scenario: same defect with a changed line number
 
-- **WHEN** 两次评审的同一缺陷只差行号
-- **THEN** 账本中只保留一条，last_seen 更新为最近一次
-- **AND** 不把本次未出现的条目自动标为已修复
+- **WHEN** the same defect in two reviews differs only by line number
+- **THEN** the ledger keeps a single entry and updates last_seen to the most recent run
+- **AND** entries absent from the current run are not automatically marked as fixed
 
-### Requirement: 覆盖下限与批量上限
+### Requirement: Coverage floor and batch caps
 
-系统 SHALL 按评审类型与档位校验覆盖下限，并限制单批发现 ≤15、单批格数 ≤25、子代理 ≤14。
+The system SHALL validate the coverage floor per review type and profile, and cap a single batch at ≤15 findings, ≤25 cells and ≤14 subagents.
 
-#### Scenario: plan 放水
+#### Scenario: plan waters down coverage
 
-- **WHEN** plan 把 dimension 写成 1 且未显式豁免
-- **THEN** gate 以覆盖下限不足拒绝出报告
+- **WHEN** the plan sets a dimension to 1 without an explicit exemption
+- **THEN** the gate rejects the report for falling below the coverage floor
 
-### Requirement: 增量批恢复
+### Requirement: Resuming an incremental batch
 
-系统 SHALL 允许增量批记录已填格，恢复时从下一格继续。
+The system SHALL let an incremental batch record the cells already filled and resume from the next cell.
 
-#### Scenario: 崩溃续跑
+#### Scenario: resuming after a crash
 
-- **WHEN** 漏项批已填 3 格后中断
-- **THEN** resume 报告该批从第 4 格继续
-- **AND** 该批最终落盘后删除 partial 文件
+- **WHEN** a batch with gaps is interrupted after 3 cells are filled
+- **THEN** resume reports that the batch continues from cell 4
+- **AND** the partial file is deleted once the batch is finally persisted

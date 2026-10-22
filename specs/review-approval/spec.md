@@ -6,52 +6,52 @@ The review-approval capability documents the published behavior for users and ma
 
 ## Requirements
 
-### Requirement: 报告先交付、后人审
+### Requirement: Reports are delivered before human review
 
-系统 SHALL 在进入 `reported` 时把 `REPORT.md` 与 `SUMMARY.md` 复制到 `specs/audit/<review-id>/`，使人工评审直接针对交付目录中的成品；只存在于工作目录的报告不算交付。
+The system SHALL copy `REPORT.md` and `SUMMARY.md` into `specs/audit/<review-id>/` when entering `reported`, so that human review targets the finished artifacts in the delivery directory; a report that exists only in the working directory does not count as delivered.
 
-#### Scenario: 进入 reported 自动交付
+#### Scenario: automatic delivery on entering reported
 
-- **WHEN** 执行 `state.mjs transition <reviewDir> reported` 且 REPORT/SUMMARY 均已写好
-- **THEN** 两件成品出现在交付目录，`state.report` 记录 dir / files / delivered_at
-- **AND** 不生成 task.md，状态为 reported
+- **WHEN** `state.mjs transition <reviewDir> reported` runs and both REPORT/SUMMARY are already written
+- **THEN** both artifacts appear in the delivery directory and `state.report` records dir / files / delivered_at
+- **AND** no task.md is generated and the state is reported
 
-#### Scenario: 成品缺失
+#### Scenario: missing artifacts
 
-- **WHEN** REPORT.md 或 SUMMARY.md 缺失或为空
-- **THEN** 拒绝进入 reported，状态保持不变，且不创建空的交付目录
+- **WHEN** REPORT.md or SUMMARY.md is missing or empty
+- **THEN** the transition to reported is rejected, the state is unchanged, and no empty delivery directory is created
 
-#### Scenario: 报告修订后重新交付
+#### Scenario: re-delivery after the report is revised
 
-- **WHEN** 人工评审提出疑问、报告被修订，执行 `state.mjs deliver <reviewDir>`
-- **THEN** 交付目录的两件被覆盖为最新工作副本，状态保持 reported
+- **WHEN** human review raises questions and the report is revised, then `state.mjs deliver <reviewDir>` runs
+- **THEN** both artifacts in the delivery directory are overwritten with the latest working copies and the state stays reported
 
-#### Scenario: 交付落后于工作副本
+#### Scenario: delivery lags behind the working copy
 
-- **WHEN** closed 时交付目录的 REPORT/SUMMARY/task.md 与工作副本内容不一致
-- **THEN** gate G14 拒绝通过
+- **WHEN** at closed the REPORT/SUMMARY/task.md in the delivery directory differ from the working copies
+- **THEN** gate G14 rejects
 
-### Requirement: 人工批准后生成修复任务
+### Requirement: Fix tasks are generated only after human approval
 
-系统 SHALL 在报告产出后保持 reported 状态，只有显式传入批准人的 approve 命令才生成 task.md、复核交付三份成品并置 closed。
+The system SHALL stay in reported after the report is produced; only an explicit approve command carrying a reviewer generates task.md, re-verifies the three delivered artifacts, and sets closed.
 
-#### Scenario: 缺批准人
+#### Scenario: missing reviewer
 
-- **WHEN** 执行 approve 但未传 reviewer
-- **THEN** 命令拒绝执行，状态保持不变
+- **WHEN** approve runs without a reviewer
+- **THEN** the command refuses to run and the state is unchanged
 
-#### Scenario: 生成任务
+#### Scenario: task generation
 
-- **WHEN** gate 通过且传入 reviewer
-- **THEN** 在交付目录生成 task.md，按共用与 P0/P1 排序，每条任务含依赖与四段式 AI 提示词
-- **AND** REPORT、SUMMARY、task.md 三份文件按工作副本重写就位后状态变为 closed
+- **WHEN** the gate passes and a reviewer is supplied
+- **THEN** task.md is generated in the delivery directory, ordered shared-first and then P0/P1, each task carrying its dependencies and a four-part AI prompt
+- **AND** REPORT, SUMMARY and task.md are rewritten in place from the working copies before the state becomes closed
 
-### Requirement: 依赖校验
+### Requirement: Dependency validation
 
-系统 SHALL 保证 task.md 中每条任务的依赖只指向前序任务，同文件任务必须有显式顺序，依赖成环时拒绝生成。
+The system SHALL ensure every dependency in task.md points only to an earlier task, that tasks touching the same file have an explicit order, and that generation is rejected when dependencies form a cycle.
 
-#### Scenario: 依赖成环
+#### Scenario: dependency cycle
 
-- **WHEN** 两条任务互相依赖
-- **THEN** 生成失败并输出具体环路径
-- **AND** 不产生 task.md，状态保持 reported
+- **WHEN** two tasks depend on each other
+- **THEN** generation fails and prints the concrete cycle path
+- **AND** no task.md is produced and the state stays reported

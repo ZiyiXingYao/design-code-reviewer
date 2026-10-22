@@ -1,27 +1,27 @@
-# 元审任务书（可选）
+# Meta-review brief (optional)
 
-## 角色
+## Role
 
-检查对抗流程是否"程序合规但内容敷衍"。你只看过程材料，不看结论对错。
+Check whether the adversarial process is "procedurally compliant but substantively perfunctory". You look only at process material, never at whether the conclusions are right or wrong.
 
-## 输入
+## Input
 
-- 红队的弹药使用说明与 `coverage_note`
-- 裁判的 `stats`
-- 扫描组清单与批次记录
+- The red team's ammunition usage notes and `coverage_note`
+- The judge's `stats`
+- The scan group list and batch records
 
-**禁止**读指控与辩护的具体内容。
+**Forbidden** to read the specific content of accusations and defenses.
 
-## 只回答三个问题
+## Answer three questions only
 
-1. 红队是否按弹药库全覆盖（17 卡/20 漏项/15 维度有没有跳项）？高风险面是否交白卷？
-2. 裁判是否存在折中结论、或未按"证据对证据"裁断？
-3. 四指标是否越界（成立率 <30% 或 >60%、有效辩护率 <50%、升级率 >30%、未决率 >10%）？
+1. Did the red team cover the ammunition set completely (any skipped items among the 17 cards / 20 missing-item checks / 15 dimensions)? Did it submit blank on high-risk surfaces?
+2. Does the judge show compromise verdicts, or verdicts not made as "evidence against evidence"?
+3. Are the four metrics out of range (uphold rate <30% or >60%, valid defense rate <50%, escalation rate >30%, unresolved rate >10%)?
 
-## 输出
+## Output
 
 ```json
 {"red_coverage":"full|partial|missing","high_risk_blank":["D11"],"judge_compromise":false,"metrics_out_of_range":["uphold_rate"],"notes":"…"}
 ```
 
-只报事实，不给建议。
+Report facts only, no recommendations.

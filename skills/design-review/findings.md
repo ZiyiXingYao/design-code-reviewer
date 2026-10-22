@@ -1,95 +1,95 @@
-# 发现构造、分级与取证
+# Finding construction, grading and evidence
 
-## 1 反例铁律
+## 1 Counterexample iron rule
 
-每条发现必须能写成：**给定 X → 系统会做出错误行为 Y → 因为没有 Z**。
-写不出只能进「风险提示」（附录），不进缺陷清单，不计入 P0/P1 数。
+Every finding must be expressible as: **given X → the system produces wrong behavior Y → because Z is missing**.
+If you cannot write it that way, it can only go into "Risk notes" (appendix), not into the defect list, and it does not count toward the P0/P1 numbers.
 
-| 差 | 好 |
+| Bad | Good |
 |---|---|
-| "任务模块并发处理需要考虑" | "同一 `subtaskSchId` 的算法结果重复到达时，设计未定义幂等键（09-任务模块 §5.5 只说'回填并推进'），同一段被推进两次，`currentSegmentTask` 覆盖为新对象而设备仍执行旧订单" |
-| "建议补充异常处理" | "`delete` 改批量后（D37）未定义部分失败语义：5 台里第 3 台不存在时，返回 `items` 算成功还是失败、已删的 2 台是否回滚均未写，实现只能自选" |
-| "状态机设计可以更完整" | "`kBound × kTaskCompleted` 不在 09-任务模块 §6.1 规则表内，设计层面就没有'拒绝'这个动作，实现只能忽略返回值" |
+| "The task module's concurrent processing needs consideration" | "When algorithm results for the same `subtaskSchId` arrive repeatedly, the design defines no idempotency key (09-任务模块 §5.5 only says 'backfill and advance'), so the same segment is advanced twice: `currentSegmentTask` is overwritten with the new object while the device still executes the old order" |
+| "Suggest adding exception handling" | "After `delete` becomes batch (D37), partial-failure semantics are undefined: when the 3rd of 5 is missing, whether the returned `items` count as success or failure, and whether the 2 already deleted are rolled back, are both unwritten, so the implementation can only choose for itself" |
+| "The state-machine design could be more complete" | "`kBound × kTaskCompleted` is not in the rule table of 09-任务模块 §6.1; at the design level the action 'reject' does not exist, so the implementation can only ignore the return value" |
 
-## 2 分级（设计阶段）
+## 2 Grading (design stage)
 
-| 级别 | 判据 | 例 |
+| Level | Criterion | Example |
 |---|---|---|
-| **P0** | 会导致：数据错误/丢失、跨服务状态不一致不可收敛、物理安全风险、无法上线（缺关键能力） | 部分失败无定义；设备身份仅连接态校验 |
-| **P1** | 特定但现实场景下功能不成立；关键非功能项缺失（幂等/恢复/背压/超时之一） | 重启丢刚写状态；无背压 |
-| **P2** | 模块边界模糊、决策缺对比、待定问题无主责、依赖方向可疑 | 业务层直连缓存；决策无理由 |
-| **P3** | 模板格式、编号、图表规范、表述 | 编号跳号；表格缺列 |
+| **P0** | Causes: wrong/lost data, non-convergent cross-service inconsistency, physical safety risk, cannot go live (a key capability is missing) | Partial failure undefined; device identity verified only from connection state |
+| **P1** | Functionality does not hold in a specific but realistic scenario; a key non-functional item is missing (one of idempotency/recovery/backpressure/timeout) | Restart loses state written just before; no backpressure |
+| **P2** | Blurred module boundaries, decisions without comparison, open items without an owner, suspicious dependency direction | Business layer talks to cache directly; decision has no rationale |
+| **P3** | Template format, numbering, diagram conventions, wording | Numbering gaps; table missing a column |
 
-**级别上限**：模式/抽象类发现封顶 P2；并发模型不一致、扫描周期 ≥ 超时为 P1；并发导致死锁/饿死可 P0。
+**Level caps**: pattern/abstract-class findings are capped at P2; inconsistent concurrency model and scan period ≥ timeout are P1; concurrency-induced deadlock/starvation can be P0.
 
-## 3 取证格式（发现条目）
+## 3 Evidence format (finding entry)
 
 ```
 F-001
-- 维度/场景：D8 / F3
-- 位置：09-任务模块.md:365（§5.5）；08-制品模块.md:120（§4.2）   # 完整文件名:行号（章节），多份全列
-- 模块：任务模块（09）
-- 功能点/流程：FP-6 段路径下发 / 批量删除的部分失败处理
-- 问题：现在文档写的是什么、缺什么（白话，不依赖反例即可读懂）
-- 反例：给定 X → 错误行为 Y → 因为缺 Z
-- 影响：…
-- 怎么改：1) … 2) … 3) …   # 分步、可执行；分号后不许被吞掉
-- 级别：P1
-- 裁断：upheld（A-007）   # 由 08-verdict.json 决定；未对抗时留空
+- Dimension/scenario: D8 / F3
+- Location: 09-任务模块.md:365 (§5.5); 08-制品模块.md:120 (§4.2)   # full file name:line (section); list every file
+- Module: task module (09)
+- Feature point/flow: FP-6 segment path dispatch / partial-failure handling of batch delete
+- Problem: what the document currently says, and what is missing (plain language; readable without the counterexample)
+- Counterexample: given X → wrong behavior Y → because Z is missing
+- Impact: …
+- Fix: 1) … 2) … 3) …   # step by step, actionable; steps after a semicolon must not be swallowed
+- Level: P1
+- Verdict: upheld (A-007)   # decided by 08-verdict.json; leave empty when not adversarial
 ```
 
-批产物里的字段（gate 会校验）：
+Fields in a batch artifact (the gate validates them):
 
 ```json
 {
   "id": "F-001",
   "level": "P1",
-  "title": "一句话（报告小节标题）",
-  "location": "文档:行（章节）；文档:行（章节）",
-  "module": "任务模块",
+  "title": "one sentence (report subsection title)",
+  "location": "document:line (section); document:line (section)",
+  "module": "task module",
   "feature": "FP-6",
-  "flow": "批量删除的部分失败处理",
-  "problem": "白话问题陈述：现在写的是什么、缺什么",
-  "mechanism": "缺什么机制（可更技术）",
-  "counterexample": "给定X → 错误Y → 因为缺Z",
-  "impact": "后果",
-  "fix": "1) … 2) …（完整改法，保留全部步骤）",
-  "suggestion": "一句话摘要（兼容字段，可为空）",
+  "flow": "partial-failure handling of batch delete",
+  "problem": "plain-language problem statement: what is currently written, what is missing",
+  "mechanism": "what mechanism is missing (may be more technical)",
+  "counterexample": "given X → wrong Y → because Z is missing",
+  "impact": "consequence",
+  "fix": "1) … 2) … (complete fix, keep every step)",
+  "suggestion": "one-sentence summary (compatibility field, may be empty)",
   "batch": "b07"
 }
 ```
 
-**字段纪律**：
+**Field discipline**:
 
-- `problem` 与 `fix` 是报告与 task.md 的正文来源，不许省略；`fix` 一步一行，禁止只写"建议完善 XX"。
-- `suggestion` 只作摘要；下游一律优先 `fix`。
-- `location` 不许缩写为 `05:338`（缺文件名）；报告与 task.md 会原样引用，缩写等于无法定位。
-- `module/feature/flow` 用于报告「按模块索引」与读者定位；跨模块发现列主模块 + 关联模块。
+- `problem` and `fix` are the body source for the report and task.md; they must not be omitted; `fix` uses one line per step, and writing only "suggest improving XX" is forbidden.
+- `suggestion` is only a summary; downstream always prefers `fix`.
+- `location` must not be abbreviated to `05:338` (missing file name); the report and task.md quote it verbatim, so an abbreviation equals being unable to locate.
+- `module/feature/flow` are used by the report's "index by module" and by readers for orientation; a cross-module finding lists the primary module + related modules.
 
-## 4 去重与合并（必须在对抗之前）
+## 4 Deduplication and merging (must happen before adversarial)
 
-| 情况 | 处理 | 台账记法 |
+| Situation | Handling | Ledger notation |
 |---|---|---|
-| 同位置 + 同机制 | 合并为一条，取最高级别 | `由 b07/b12 共同发现` |
-| 同位置 + 不同机制 | 保留两条，互标 `related` | 可能是同一根因的两个面，留给人判 |
-| 不同位置 + 同机制 | 合并为"模式化问题"，列出全部位置 | ≥3 处标**系统性问题**，级别上调一档（封顶 P1） |
-| 同位置 + 级别分歧 | 取高，记录双方理由 | `b07 判 P2、b12 判 P1，采信 P1：…` |
-| 与 ledger 历史条目重复 | 不重复报，只更新状态 | `仍存在（F-007）` / `已修复（F-012）` |
+| Same location + same mechanism | Merge into one entry, take the highest level | `found jointly by b07/b12` |
+| Same location + different mechanism | Keep both, cross-mark `related` | Possibly two faces of one root cause; leave it to a human |
+| Different location + same mechanism | Merge into a "patterned problem" and list every location | ≥3 locations → mark **systemic problem**, raise one level (capped at P1) |
+| Same location + level disagreement | Take the higher one, record both rationales | `b07 said P2, b12 said P1; P1 adopted: …` |
+| Duplicate of a historical ledger entry | Do not report again; only update status | `still present (F-007)` / `fixed (F-012)` |
 
-**时机**：扫描收齐后、红队攻击前。否则红队对同一问题重复攻击，指标失真。
+**Timing**: after scanning is complete and before the red team attacks. Otherwise the red team attacks the same problem repeatedly and the metrics are distorted.
 
-## 5 排序：按修复顺序，不按级别
+## 5 Ordering: by fix order, not by level
 
-P0 全在 P1 之前；同级别内按依赖排序：
+All P0 findings come before P1 findings; within a level, order by dependency:
 
-| 优先级 | 判据 | 理由 |
+| Priority | Criterion | Reason |
 |---|---|---|
-| 1 | 其他修复依赖它的 | 先补状态机转移，再修基于它的收尾逻辑 |
-| 2 | 独立的、改动面小的 | 快刀，降低总风险 |
-| 3 | 改动会波及多处的 | 需要更大回归范围，放后 |
+| 1 | Other fixes depend on it | Add the state-machine transitions first, then fix the finalization logic built on them |
+| 2 | Independent, small change surface | Quick wins that lower overall risk |
+| 3 | Changes that ripple to many places | Needs a larger regression scope; do it later |
 
-每条发现带 `depends_on: [F-003]`。**没有依赖字段的发现不许进入必办清单。**
+Every finding carries `depends_on: [F-003]`. **A finding without a dependency field must not enter the must-do list.**
 
-## 6 Risk 提示
+## 6 Risk notes
 
-写不出反例的观察（"这段描述可能有歧义""建议补图"）只能进附录「风险提示」，不占 P0–P2 名额，也不进对抗。
+Observations that cannot be written as counterexamples ("this description may be ambiguous", "suggest adding a diagram") may only go into the appendix "Risk notes"; they do not occupy a P0–P2 slot and do not enter the adversarial process.

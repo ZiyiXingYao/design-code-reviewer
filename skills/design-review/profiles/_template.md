@@ -4,18 +4,18 @@
 name: <name>
 applies_to: ["<glob>"]
 extends:
-  - {lens: <N>-<name>, add_checks: ["<检查点>"]}
+  - {lens: <N>-<name>, add_checks: ["<checkpoint>"]}
 provides_cases: true
 ```
 
-## 追加检查点
+## Appended checkpoints
 
-| 镜头/维度 | 检查点 | 判据 | 归约到的通用原则 | 级别上限 |
+| Lens/dimension | Checkpoint | Criterion | General principle reduced to | Level cap |
 |---|---|---|---|---|
 | | | | | |
 
-## 案例
+## Cases
 
-| 案例 | 说明 | 对应检查点 |
+| Case | Description | Corresponding checkpoint |
 |---|---|---|
 | | | |
